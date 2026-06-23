@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:3306/fmsv_db?serverTimezone=Asia/Bangkok&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mariadb://${DB_HOST:localhost}:3306/fmsv_db
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:

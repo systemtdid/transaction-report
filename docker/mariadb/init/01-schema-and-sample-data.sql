@@ -1,7 +1,7 @@
 -- =========================================================================
 -- Transaction Report — local development schema + sample data
 --
--- Runs automatically ONCE when the MySQL data volume is first initialized.
+-- Runs automatically ONCE when the MariaDB data volume is first initialized.
 -- This is SAMPLE data for local development, NOT production data. To point
 -- the app at a real fmsv_db, change DB_HOST/DB_USER/DB_PASSWORD instead.
 -- =========================================================================
@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     KEY idx_gateway (gatewayID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Allow the recursive generators below to run -----------------------------
-SET SESSION cte_max_recursion_depth = 1000000;
+-- Note: MariaDB's recursive-CTE iteration cap (max_recursive_iterations) is
+-- effectively unlimited by default, so no session tuning is needed here.
 
 -- Shared generators: every day of 2026-01-01 .. 2026-06-30, and 1..600 ----
 -- Counts vary per day so the reports look realistic.

@@ -1,4 +1,4 @@
-# Transaction Report — full local stack (app + MySQL).
+# Transaction Report — full local stack (app + MariaDB).
 #
 # Quick start:
 #   docker compose up --build
@@ -9,22 +9,22 @@
 
 services:
   db:
-    image: mysql:8.0
+    image: mariadb:11.4
     container_name: txreport-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw_dev}
-      MYSQL_DATABASE: ${DB_NAME:-fmsv_db}
-      MYSQL_USER: ${DB_USER:-reporting_ro}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-txreport_dev_pw}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-rootpw_dev}
+      MARIADB_DATABASE: ${DB_NAME:-fmsv_db}
+      MARIADB_USER: ${DB_USER:-reporting_ro}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-txreport_dev_pw}
     ports:
       - "${DB_PORT:-3306}:3306"
     volumes:
       - db-data:/var/lib/mysql
       # Schema + sample data, applied once on first initialization
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-rootpw_dev}"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 10

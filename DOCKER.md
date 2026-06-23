@@ -1,13 +1,13 @@
 # Running the Transaction Report project with Docker
 
 This stack runs **everything the project needs** in containers — you do **not**
-need to install Java, Maven, MySQL, or Thai fonts on your PC. The only thing you
+need to install Java, Maven, MariaDB, or Thai fonts on your PC. The only thing you
 install once is **Docker** itself.
 
 ```
 ┌─────────────────────────┐        ┌──────────────────────────┐
 │  txreport-app           │        │  txreport-db             │
-│  Spring Boot + JRE 17   │  --->  │  MySQL 8.0               │
+│  Spring Boot + JRE 17   │  --->  │  MariaDB 11.4            │
 │  Thai fonts (Noto+TLWG) │        │  fmsv_db + sample data   │
 │  http://localhost:8080  │        │  localhost:3306          │
 └─────────────────────────┘        └──────────────────────────┘
@@ -74,9 +74,9 @@ docker compose down -v           # also delete the database volume (fresh start)
 | Service | Image | Purpose |
 |---------|-------|---------|
 | `app`   | built from `Dockerfile` | Spring Boot web app + Thai PDF rendering |
-| `db`    | `mysql:8.0` | `fmsv_db` with the `transactions` table + sample data |
+| `db`    | `mariadb:11.4` | `fmsv_db` with the `transactions` table + sample data |
 
-- **Sample data** (`docker/mysql/init/01-schema-and-sample-data.sql`) is loaded
+- **Sample data** (`docker/mariadb/init/01-schema-and-sample-data.sql`) is loaded
   automatically on first start, covering Jan–Jun 2026 for GSB, DHIP, KTB, TMC so
   reports are non-empty immediately. It is clearly *development* data.
 - The **Noto Sans Thai** font is bundled (`docker/fonts/`) and used as the
@@ -103,12 +103,12 @@ cp .env.example .env
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `APP_PORT` | `8080` | Host port for the web UI |
-| `DB_PORT` | `3306` | Host port exposing MySQL |
+| `DB_PORT` | `3306` | Host port exposing MariaDB |
 | `DB_NAME` | `fmsv_db` | Database name |
 | `DB_USER` / `DB_PASSWORD` | `reporting_ro` / `txreport_dev_pw` | App DB credentials |
-| `MYSQL_ROOT_PASSWORD` | `rootpw_dev` | MySQL root password |
+| `MARIADB_ROOT_PASSWORD` | `rootpw_dev` | MariaDB root password |
 
-### Point at a real (external) database instead of the bundled MySQL
+### Point at a real (external) database instead of the bundled MariaDB
 Remove/ignore the `db` service and set, in `.env`:
 
 ```bash
