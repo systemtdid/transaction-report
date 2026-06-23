@@ -1,0 +1,50 @@
+# Transaction Report — full local stack (app + MySQL).
+#
+# Quick start:
+#   docker compose up --build
+# Then open http://localhost:8080
+#
+# Credentials/ports can be overridden via a .env file (see .env.example);
+# the defaults below let the stack run out of the box for local development.
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: txreport-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw_dev}
+      MYSQL_DATABASE: ${DB_NAME:-fmsv_db}
+      MYSQL_USER: ${DB_USER:-reporting_ro}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-txreport_dev_pw}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      # Schema + sample data, applied once on first initialization
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-rootpw_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: txreport-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_USER: ${DB_USER:-reporting_ro}
+      DB_PASSWORD: ${DB_PASSWORD:-txreport_dev_pw}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  db-data:

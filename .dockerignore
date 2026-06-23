@@ -1,0 +1,13 @@
+target/
+**/target/
+.git/
+.gitignore
+*.md
+!ARCHITECTURE.md
+.idea/
+.vscode/
+*.iml
+Template/
+manual-script/
+PDF-Gen/example/
+PDF-Gen/*.tar
