@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:3306/fmsv_db?serverTimezone=Asia/Bangkok&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${DB_USER:reporting_ro}
-    password: ${DB_PASSWORD:changeme}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     hikari:
       read-only: true
       maximum-pool-size: 5
