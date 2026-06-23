@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Error</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 40px; }
+        .box { max-width: 500px; margin: auto; background: #fff; padding: 28px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { color: #c00; }
+        a { color: #003380; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h2>Error</h2>
+    <p th:text="${error}">Something went wrong.</p>
+    <a href="/">&#8592; Back to report generator</a>
+</div>
+</body>
+</html>

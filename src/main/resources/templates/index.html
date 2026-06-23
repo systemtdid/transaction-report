@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Transaction Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 32px;
+        }
+        h1 {
+            color: #003380;
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 28px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #333;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        select, input[type="text"], input[type="month"] {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .radio-group {
+            display: flex;
+            gap: 24px;
+        }
+        .radio-group label {
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        button[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background: #003380;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button[type="submit"]:hover {
+            background: #0047b3;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo span {
+            font-size: 11px;
+            color: #888;
+        }
+        .tdid-brand {
+            font-size: 18px;
+            font-weight: bold;
+            color: #003380;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="logo">
+        <div class="tdid-brand">THAI DIGITAL ID</div>
+        <span>Thai Digital Identity Company Limited</span>
+    </div>
+    <h1>Transaction Report</h1>
+    <p class="subtitle">Generate daily or monthly transaction summary reports.</p>
+
+    <form action="/report" method="get">
+        <div class="form-group">
+            <label for="orgId">Organization</label>
+            <select id="orgId" name="orgId" required="required">
+                <option value="">— Select organization —</option>
+                <option th:each="org : ${orgs}"
+                        th:value="${org.orgId}"
+                        th:text="${org.displayName + ' (' + org.orgId + ')'}">Org Name</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Report Type</label>
+            <div class="radio-group">
+                <label>
+                    <input type="radio" name="type" value="DAILY" checked="checked"/>
+                    Daily (per-day count)
+                </label>
+                <label>
+                    <input type="radio" name="type" value="MONTHLY"/>
+                    Monthly (billing summary)
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="period">Period (optional — defaults to current/previous month)</label>
+            <input type="month" id="period" name="period" placeholder="yyyy-MM"/>
+        </div>
+
+        <button type="submit">&#8595; Download PDF</button>
+    </form>
+</div>
+</body>
+</html>

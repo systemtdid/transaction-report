@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:3306/fmsv_db?serverTimezone=Asia/Bangkok&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:reporting_ro}
+    password: ${DB_PASSWORD:changeme}
+    hikari:
+      read-only: true
+      maximum-pool-size: 5
+      connection-timeout: 10000
+  thymeleaf:
+    mode: HTML
+    encoding: UTF-8
+    cache: false
+
+txreport:
+  default-zone: Asia/Bangkok
+  fonts:
+    noto: ${FONT_NOTO:}
+    tahoma: ${FONT_TAHOMA:/mnt/c/Windows/Fonts/tahoma.ttf}
+    sarabun: ${FONT_SARABUN:}
+  orgs:
+    - org-id: "0994000164891"
+      display-name: "Government Saving Bank"
+      gateway-id: "TIPxGSB01"
+    - org-id: "0107537000882"
+      display-name: "Krung Thai Bank"
+    - org-id: "0994000953534"
+      display-name: "TMC"
+    - org-id: "0107556000051"
+      display-name: "DHIP"
+      fee-schedule:
+        minimum-transactions: 720000
+        tiers:
+          - { from: 1,       to: 720000,   rate: 0.70 }
+          - { from: 720001,  to: 1440000,  rate: 0.65 }
+          - { from: 1440001, to: 2160000,  rate: 0.60 }
+          - { from: 2160001, to: 2880000,  rate: 0.55 }
+          - { from: 2880001, to: null,     rate: 0.50 }
+
+logging:
+  level:
+    com.tdid.txreport: DEBUG
+    com.openhtmltopdf: WARN

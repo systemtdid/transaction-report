@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Transaction Summary Report of Signing Service</title>
+    <style>
+        @page { size: A4 portrait; margin: 15mm 15mm; }
+        body { font-family: 'Tahoma', 'Noto Sans Thai', sans-serif; font-size: 10pt; color: #111; }
+
+        /* Letterhead */
+        .letterhead { border-bottom: 2pt solid #003380; padding-bottom: 4mm; margin-bottom: 4mm; display: table; width: 100%; }
+        .lh-left { display: table-cell; width: 60%; vertical-align: top; }
+        .lh-right { display: table-cell; width: 40%; vertical-align: top; text-align: right; font-size: 8pt; color: #444; line-height: 1.5; }
+        .brand { font-size: 14pt; font-weight: bold; color: #003380; }
+        .brand-th { font-size: 9pt; color: #555; }
+
+        /* Title */
+        .report-title { text-align: center; margin-bottom: 5mm; }
+        .report-title h1 { font-size: 13pt; color: #003380; margin: 0 0 1mm 0; }
+        .report-title h2 { font-size: 11pt; margin: 0; font-weight: normal; }
+        .report-title .period { font-size: 10pt; color: #333; margin-top: 2mm; }
+
+        /* Meta row */
+        .meta-row { font-size: 9pt; margin-bottom: 4mm; }
+        .meta-row table { width: auto; border: none; }
+        .meta-row td { border: none; padding: 1pt 6pt 1pt 0; }
+
+        /* Tier table */
+        table.tier-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 3mm; }
+        table.tier-table th { background-color: #003380; color: #fff; padding: 4pt 6pt; text-align: center; border: 1pt solid #003380; }
+        table.tier-table td { padding: 3pt 6pt; border: 0.5pt solid #ccc; }
+        table.tier-table td.num { text-align: right; }
+        table.tier-table td.center { text-align: center; }
+        table.tier-table tr.alt td { background-color: #f5f7fb; }
+        table.tier-table tr.total td { font-weight: bold; background-color: #dce4f5; border-top: 1.5pt solid #003380; }
+
+        /* Summary */
+        .summary { margin-top: 3mm; font-size: 9pt; }
+        .summary table { width: auto; margin-left: 0; border: none; }
+        .summary td { border: none; padding: 1pt 8pt 1pt 0; }
+        .summary td.val { text-align: right; font-weight: bold; min-width: 80pt; }
+        .summary .label { color: #333; }
+
+        /* Remark */
+        .remark { font-style: italic; color: #c00; font-size: 9pt; margin-top: 3mm; }
+
+        /* Run stamp */
+        .run-stamp { font-size: 8pt; color: #555; margin-top: 4mm; }
+
+        /* Footer */
+        .footer { border-top: 1pt solid #ccc; margin-top: 8mm; padding-top: 2mm; font-size: 8pt; color: #666; text-align: center; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <!-- Letterhead -->
+    <div class="letterhead">
+        <div class="lh-left">
+            <div class="brand">THAI DIGITAL ID</div>
+            <div class="brand-th">บริษัท ไทย ดิจิทัล ไอดี จำกัด</div>
+        </div>
+        <div class="lh-right">
+            319 25th Floor, Room 10-11, Chamchuri Square Building,<br/>
+            Phayathai Road, Pathumwan, Bangkok 10330<br/>
+            Tel: 02 029 0290 &bull; Fax: 02 029 0293<br/>
+            support@thaidigitalid.com &bull; www.thaidigitalid.com
+        </div>
+    </div>
+
+    <!-- Report title -->
+    <div class="report-title">
+        <h1>A Transaction Summary Report of Signing Service</h1>
+        <h2 th:text="'for ' + ${data.org.displayName}">for Organization</h2>
+        <div class="period">
+            As of <span th:text="${#temporals.format(data.period.atDay(1), 'MMMM yyyy')}">Month Year</span>
+        </div>
+    </div>
+
+    <!-- Meta -->
+    <div class="meta-row">
+        <table>
+            <tr>
+                <td><strong>Organization:</strong></td>
+                <td th:text="${data.org.orgId}">ORG_ID</td>
+                <td style="padding-left:16pt;"><strong>File Type:</strong></td>
+                <td>PDF</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Tier fee table (only when org has a fee schedule) -->
+    <div th:if="${data.org.hasFeeSchedule()}">
+        <table class="tier-table">
+            <thead>
+                <tr>
+                    <th>Transaction Tier</th>
+                    <th>Transaction Fee Rate (Baht)</th>
+                    <th>No. of usage Transaction</th>
+                    <th>Fee (Baht)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="line, stat : ${data.lines}" th:class="${stat.even} ? '' : 'alt'">
+                    <td class="center" th:text="${line.tier.displayRange()}">Range</td>
+                    <td class="num" th:text="${#numbers.formatDecimal(line.tier.rate(), 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                    <td class="num" th:text="${#numbers.formatInteger(line.usageCount, 1, 'COMMA')}">0</td>
+                    <td class="num" th:text="${#numbers.formatDecimal(line.fee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr class="total">
+                    <td colspan="2">Total</td>
+                    <td class="num" th:text="${#numbers.formatInteger(data.totalUsage, 1, 'COMMA')}">0</td>
+                    <td class="num" th:text="${#numbers.formatDecimal(data.computedFee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Summary / billing totals -->
+    <div class="summary">
+        <table>
+            <tr>
+                <td class="label">
+                    Accumulated Transaction
+                    (<span th:text="${#temporals.format(data.period.atDay(1), 'MMM yyyy')}">Mon Year</span>):
+                </td>
+                <td class="val" th:text="${#numbers.formatInteger(data.accumulatedTransactions, 1, 'COMMA')}">0</td>
+            </tr>
+            <tr>
+                <td class="label">Total Fee Amount (Baht):</td>
+                <td class="val" th:text="${#numbers.formatDecimal(data.billedFee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+            </tr>
+            <tr th:if="${!data.org.hasFeeSchedule()}">
+                <td class="label">No. of usage Transaction:</td>
+                <td class="val" th:text="${#numbers.formatInteger(data.totalUsage, 1, 'COMMA')}">0</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Remark when below minimum -->
+    <div class="remark" th:if="${data.belowMinimum}">
+        Remark: <span th:text="${data.remark}">Remark text</span>
+    </div>
+
+    <!-- Run stamp -->
+    <div class="run-stamp">
+        Run Date: <span th:text="${#temporals.format(data.runStamp, 'dd/MM/yyyy')}">DD/MM/YYYY</span>
+        &nbsp;&nbsp;&nbsp;
+        Run Time: <span th:text="${#temporals.format(data.runStamp, 'HH:mm:ss')}">HH:MM:SS</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        Thai Digital Identity Company Limited (บริษัท ไทย ดิจิทัล ไอดี จำกัด)<br/>
+        319 25th Floor, Room 10-11, Chamchuri Square Building, Phayathai Road, Pathumwan, Bangkok 10330<br/>
+        Tel: 02 029 0290 &bull; Fax: 02 029 0293 &bull; support@thaidigitalid.com &bull; www.thaidigitalid.com
+    </div>
+</body>
+</html>

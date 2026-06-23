@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.de8tech.example</groupId>
+    <artifactId>thai-pdf-example</artifactId>
+    <version>1.0</version>
+
+    <properties>
+        <maven.compiler.release>11</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!--
+          thai-pdf-glyphshaping must be installed to your local Maven repository first.
+          See TESTING.md for the one-line install command.
+        -->
+        <dependency>
+            <groupId>io.github.de8tech</groupId>
+            <artifactId>thai-pdf-glyphshaping</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+
+        <!--
+          SLF4J backend — provides logging output and silences the
+          "SLF4J(W): No SLF4J providers were found" notice.
+          Set org.slf4j.simpleLogger.defaultLogLevel=warn in simplelogger.properties
+          or via -Dorg.slf4j.simpleLogger.defaultLogLevel=warn to quiet INFO output.
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.12</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>ThaiPdfExample</mainClass>
+                    <systemProperties>
+                        <!-- Suppress slf4j-simple INFO chatter; WARN and above still show -->
+                        <systemProperty>
+                            <key>org.slf4j.simpleLogger.defaultLogLevel</key>
+                            <value>warn</value>
+                        </systemProperty>
+                    </systemProperties>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

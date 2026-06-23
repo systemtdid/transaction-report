@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Transaction Summary Report</title>
+    <style>
+        @page { size: A4 portrait; margin: 18mm 16mm; }
+        body { font-family: 'Tahoma', 'Noto Sans Thai', sans-serif; font-size: 11pt; color: #111; }
+        .header { text-align: center; border-bottom: 2pt solid #003380; padding-bottom: 5mm; margin-bottom: 5mm; }
+        .header h1 { font-size: 16pt; color: #003380; margin: 0 0 2mm 0; }
+        .header h2 { font-size: 12pt; margin: 0; font-weight: normal; }
+        .meta { font-size: 10pt; margin-bottom: 5mm; }
+        table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+        th { background-color: #003380; color: #fff; padding: 4pt 8pt; text-align: center; border: 1pt solid #003380; }
+        td { padding: 3pt 8pt; border: 0.5pt solid #ccc; }
+        td.num { text-align: right; }
+        tr.alt td { background-color: #f5f7fb; }
+        tr.total td { font-weight: bold; background-color: #dce4f5; border-top: 1.5pt solid #003380; }
+        .footer { margin-top: 10mm; border-top: 1pt solid #ccc; padding-top: 3mm; font-size: 8pt; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Transaction Summary Report</h1>
+        <h2 th:text="'For ' + ${data.org.displayName}">For Organization</h2>
+    </div>
+
+    <div class="meta">
+        <table style="width:auto; border:none;">
+            <tr>
+                <td style="border:none; padding:1pt 4pt;"><strong>Organization:</strong></td>
+                <td style="border:none; padding:1pt 4pt;" th:text="${data.org.orgId}">ORG_ID</td>
+                <td style="border:none; padding:1pt 20pt;"></td>
+                <td style="border:none; padding:1pt 4pt;"><strong>As of:</strong></td>
+                <td style="border:none; padding:1pt 4pt;"
+                    th:text="${#temporals.format(data.period.atDay(1), 'MMMM, yyyy')}">Month, Year</td>
+            </tr>
+        </table>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>No. of Transaction</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="row, stat : ${data.rows}" th:class="${stat.even} ? '' : 'alt'">
+                <td th:text="${#temporals.format(row.date, 'dd MMMM yyyy')}">01 January 2026</td>
+                <td class="num" th:text="${#numbers.formatInteger(row.count, 1, 'COMMA')}">0</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr class="total">
+                <td>Total Transaction</td>
+                <td class="num" th:text="${#numbers.formatInteger(data.total, 1, 'COMMA')}">0</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="footer">
+        Thai Digital Identity Company Limited &bull; 319 25th Floor, Room 10-11, Chamchuri Square Building,
+        Phayathai Road, Pathumwan, Bangkok 10330 &bull; www.thaidigitalid.com
+    </div>
+</body>
+</html>
