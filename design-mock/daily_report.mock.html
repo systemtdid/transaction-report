@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<!--
+  DESIGN MOCK — Daily report. Open this directly in a browser.
+  This is the SAME layout the app produces, but with the Thymeleaf data slots
+  replaced by realistic sample values so you can design against it.
+  When you redesign, see DESIGNER-HANDOFF.md §4a for which pieces are dynamic:
+    - the org name / org id / period
+    - the table rows (one PER DAY — 28 to 31 of them; here: 31 days of May 2026)
+    - the total
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Transaction Summary Report</title>
+    <style>
+        @page { size: A4 portrait; margin: 18mm 16mm; }
+        body { font-family: 'Tahoma', 'Noto Sans Thai', sans-serif; font-size: 11pt; color: #111; }
+        .header { text-align: center; border-bottom: 2pt solid #003380; padding-bottom: 5mm; margin-bottom: 5mm; }
+        .header h1 { font-size: 16pt; color: #003380; margin: 0 0 2mm 0; }
+        .header h2 { font-size: 12pt; margin: 0; font-weight: normal; }
+        .meta { font-size: 10pt; margin-bottom: 5mm; }
+        table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+        th { background-color: #003380; color: #fff; padding: 4pt 8pt; text-align: center; border: 1pt solid #003380; }
+        td { padding: 3pt 8pt; border: 0.5pt solid #ccc; }
+        td.num { text-align: right; }
+        tr.alt td { background-color: #f5f7fb; }
+        tr.total td { font-weight: bold; background-color: #dce4f5; border-top: 1.5pt solid #003380; }
+        .footer { margin-top: 10mm; border-top: 1pt solid #ccc; padding-top: 3mm; font-size: 8pt; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Transaction Summary Report</h1>
+        <h2>For Government Saving Bank</h2>
+    </div>
+
+    <div class="meta">
+        <table style="width:auto; border:none;">
+            <tr>
+                <td style="border:none; padding:1pt 4pt;"><strong>Organization:</strong></td>
+                <td style="border:none; padding:1pt 4pt;">0994000164891</td>
+                <td style="border:none; padding:1pt 20pt;"></td>
+                <td style="border:none; padding:1pt 4pt;"><strong>As of:</strong></td>
+                <td style="border:none; padding:1pt 4pt;">May, 2026</td>
+            </tr>
+        </table>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>No. of Transaction</th>
+            </tr>
+        </thead>
+        <tbody>
+                <tr>
+                    <td>01 May 2026</td>
+                    <td class="num">307</td>
+                </tr>
+                <tr class="alt">
+                    <td>02 May 2026</td>
+                    <td class="num">314</td>
+                </tr>
+                <tr>
+                    <td>03 May 2026</td>
+                    <td class="num">321</td>
+                </tr>
+                <tr class="alt">
+                    <td>04 May 2026</td>
+                    <td class="num">328</td>
+                </tr>
+                <tr>
+                    <td>05 May 2026</td>
+                    <td class="num">335</td>
+                </tr>
+                <tr class="alt">
+                    <td>06 May 2026</td>
+                    <td class="num">342</td>
+                </tr>
+                <tr>
+                    <td>07 May 2026</td>
+                    <td class="num">349</td>
+                </tr>
+                <tr class="alt">
+                    <td>08 May 2026</td>
+                    <td class="num">356</td>
+                </tr>
+                <tr>
+                    <td>09 May 2026</td>
+                    <td class="num">363</td>
+                </tr>
+                <tr class="alt">
+                    <td>10 May 2026</td>
+                    <td class="num">370</td>
+                </tr>
+                <tr>
+                    <td>11 May 2026</td>
+                    <td class="num">377</td>
+                </tr>
+                <tr class="alt">
+                    <td>12 May 2026</td>
+                    <td class="num">384</td>
+                </tr>
+                <tr>
+                    <td>13 May 2026</td>
+                    <td class="num">391</td>
+                </tr>
+                <tr class="alt">
+                    <td>14 May 2026</td>
+                    <td class="num">398</td>
+                </tr>
+                <tr>
+                    <td>15 May 2026</td>
+                    <td class="num">405</td>
+                </tr>
+                <tr class="alt">
+                    <td>16 May 2026</td>
+                    <td class="num">412</td>
+                </tr>
+                <tr>
+                    <td>17 May 2026</td>
+                    <td class="num">419</td>
+                </tr>
+                <tr class="alt">
+                    <td>18 May 2026</td>
+                    <td class="num">426</td>
+                </tr>
+                <tr>
+                    <td>19 May 2026</td>
+                    <td class="num">433</td>
+                </tr>
+                <tr class="alt">
+                    <td>20 May 2026</td>
+                    <td class="num">440</td>
+                </tr>
+                <tr>
+                    <td>21 May 2026</td>
+                    <td class="num">447</td>
+                </tr>
+                <tr class="alt">
+                    <td>22 May 2026</td>
+                    <td class="num">454</td>
+                </tr>
+                <tr>
+                    <td>23 May 2026</td>
+                    <td class="num">301</td>
+                </tr>
+                <tr class="alt">
+                    <td>24 May 2026</td>
+                    <td class="num">308</td>
+                </tr>
+                <tr>
+                    <td>25 May 2026</td>
+                    <td class="num">315</td>
+                </tr>
+                <tr class="alt">
+                    <td>26 May 2026</td>
+                    <td class="num">322</td>
+                </tr>
+                <tr>
+                    <td>27 May 2026</td>
+                    <td class="num">329</td>
+                </tr>
+                <tr class="alt">
+                    <td>28 May 2026</td>
+                    <td class="num">336</td>
+                </tr>
+                <tr>
+                    <td>29 May 2026</td>
+                    <td class="num">343</td>
+                </tr>
+                <tr class="alt">
+                    <td>30 May 2026</td>
+                    <td class="num">350</td>
+                </tr>
+                <tr>
+                    <td>31 May 2026</td>
+                    <td class="num">357</td>
+                </tr>
+        </tbody>
+        <tfoot>
+            <tr class="total">
+                <td>Total Transaction</td>
+                <td class="num">11,332</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="footer">
+        Thai Digital Identity Company Limited &#8226; 319 25th Floor, Room 10-11, Chamchuri Square Building,
+        Phayathai Road, Pathumwan, Bangkok 10330 &#8226; www.thaidigitalid.com
+    </div>
+</body>
+</html>

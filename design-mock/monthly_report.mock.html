@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!--
+  DESIGN MOCK — Monthly report. Open this directly in a browser.
+  Same layout the app produces, with the Thymeleaf data slots replaced by
+  realistic sample values (DHIP, May 2026, a "below minimum" billing case).
+  See DESIGNER-HANDOFF.md §4b for which pieces are dynamic. Note especially:
+    - The whole TIER TABLE shows only for orgs with a fee schedule (shown here).
+    - The tier table has up to 5 rows (one per fee tier).
+    - The red REMARK line shows only when usage is below the contractual minimum
+      (shown here). For a normal billing org it would be hidden and the billed
+      fee would equal the computed fee.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Transaction Summary Report of Signing Service</title>
+    <style>
+        @page { size: A4 portrait; margin: 15mm 15mm; }
+        body { font-family: 'Tahoma', 'Noto Sans Thai', sans-serif; font-size: 10pt; color: #111; }
+
+        /* Letterhead */
+        .letterhead { border-bottom: 2pt solid #003380; padding-bottom: 4mm; margin-bottom: 4mm; display: table; width: 100%; }
+        .lh-left { display: table-cell; width: 60%; vertical-align: top; }
+        .lh-right { display: table-cell; width: 40%; vertical-align: top; text-align: right; font-size: 8pt; color: #444; line-height: 1.5; }
+        .brand { font-size: 14pt; font-weight: bold; color: #003380; }
+        .brand-th { font-size: 9pt; color: #555; }
+
+        /* Title */
+        .report-title { text-align: center; margin-bottom: 5mm; }
+        .report-title h1 { font-size: 13pt; color: #003380; margin: 0 0 1mm 0; }
+        .report-title h2 { font-size: 11pt; margin: 0; font-weight: normal; }
+        .report-title .period { font-size: 10pt; color: #333; margin-top: 2mm; }
+
+        /* Meta row */
+        .meta-row { font-size: 9pt; margin-bottom: 4mm; }
+        .meta-row table { width: auto; border: none; }
+        .meta-row td { border: none; padding: 1pt 6pt 1pt 0; }
+
+        /* Tier table */
+        table.tier-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 3mm; }
+        table.tier-table th { background-color: #003380; color: #fff; padding: 4pt 6pt; text-align: center; border: 1pt solid #003380; }
+        table.tier-table td { padding: 3pt 6pt; border: 0.5pt solid #ccc; }
+        table.tier-table td.num { text-align: right; }
+        table.tier-table td.center { text-align: center; }
+        table.tier-table tr.alt td { background-color: #f5f7fb; }
+        table.tier-table tr.total td { font-weight: bold; background-color: #dce4f5; border-top: 1.5pt solid #003380; }
+
+        /* Summary */
+        .summary { margin-top: 3mm; font-size: 9pt; }
+        .summary table { width: auto; margin-left: 0; border: none; }
+        .summary td { border: none; padding: 1pt 8pt 1pt 0; }
+        .summary td.val { text-align: right; font-weight: bold; min-width: 80pt; }
+        .summary .label { color: #333; }
+
+        /* Remark */
+        .remark { font-style: italic; color: #c00; font-size: 9pt; margin-top: 3mm; }
+
+        /* Run stamp */
+        .run-stamp { font-size: 8pt; color: #555; margin-top: 4mm; }
+
+        /* Footer */
+        .footer { border-top: 1pt solid #ccc; margin-top: 8mm; padding-top: 2mm; font-size: 8pt; color: #666; text-align: center; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <!-- Letterhead -->
+    <div class="letterhead">
+        <div class="lh-left">
+            <div class="brand">THAI DIGITAL ID</div>
+            <div class="brand-th">บริษัท ไทย ดิจิทัล ไอดี จำกัด</div>
+        </div>
+        <div class="lh-right">
+            319 25th Floor, Room 10-11, Chamchuri Square Building,<br/>
+            Phayathai Road, Pathumwan, Bangkok 10330<br/>
+            Tel: 02 029 0290 &#8226; Fax: 02 029 0293<br/>
+            support@thaidigitalid.com &#8226; www.thaidigitalid.com
+        </div>
+    </div>
+
+    <!-- Report title -->
+    <div class="report-title">
+        <h1>A Transaction Summary Report of Signing Service</h1>
+        <h2>for DHIP</h2>
+        <div class="period">
+            As of <span>May 2026</span>
+        </div>
+    </div>
+
+    <!-- Meta -->
+    <div class="meta-row">
+        <table>
+            <tr>
+                <td><strong>Organization:</strong></td>
+                <td>0107556000051</td>
+                <td style="padding-left:16pt;"><strong>File Type:</strong></td>
+                <td>PDF</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Tier fee table (only when org has a fee schedule) -->
+    <div>
+        <table class="tier-table">
+            <thead>
+                <tr>
+                    <th>Transaction Tier</th>
+                    <th>Transaction Fee Rate (Baht)</th>
+                    <th>No. of usage Transaction</th>
+                    <th>Fee (Baht)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="center">1 - 720,000</td>
+                    <td class="num">0.70</td>
+                    <td class="num">9,900</td>
+                    <td class="num">6,930.00</td>
+                </tr>
+                <tr class="alt">
+                    <td class="center">720,001 - 1,440,000</td>
+                    <td class="num">0.65</td>
+                    <td class="num">0</td>
+                    <td class="num">0.00</td>
+                </tr>
+                <tr>
+                    <td class="center">1,440,001 - 2,160,000</td>
+                    <td class="num">0.60</td>
+                    <td class="num">0</td>
+                    <td class="num">0.00</td>
+                </tr>
+                <tr class="alt">
+                    <td class="center">2,160,001 - 2,880,000</td>
+                    <td class="num">0.55</td>
+                    <td class="num">0</td>
+                    <td class="num">0.00</td>
+                </tr>
+                <tr>
+                    <td class="center">2,880,001 ++</td>
+                    <td class="num">0.50</td>
+                    <td class="num">0</td>
+                    <td class="num">0.00</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr class="total">
+                    <td colspan="2">Total</td>
+                    <td class="num">9,900</td>
+                    <td class="num">6,930.00</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Summary / billing totals -->
+    <div class="summary">
+        <table>
+            <tr>
+                <td class="label">
+                    Accumulated Transaction
+                    (<span>May 2026</span>):
+                </td>
+                <td class="val">9,900</td>
+            </tr>
+            <tr>
+                <td class="label">Total Fee Amount (Baht):</td>
+                <td class="val">0.00</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Remark when below minimum -->
+    <div class="remark">
+        Remark: <span>Number of usage transaction has not exceeded the minimum limit.</span>
+    </div>
+
+    <!-- Run stamp -->
+    <div class="run-stamp">
+        Run Date: <span>24/06/2026</span>
+        &#160;&#160;&#160;
+        Run Time: <span>11:47:06</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        Thai Digital Identity Company Limited (บริษัท ไทย ดิจิทัล ไอดี จำกัด)<br/>
+        319 25th Floor, Room 10-11, Chamchuri Square Building, Phayathai Road, Pathumwan, Bangkok 10330<br/>
+        Tel: 02 029 0290 &#8226; Fax: 02 029 0293 &#8226; support@thaidigitalid.com &#8226; www.thaidigitalid.com
+    </div>
+</body>
+</html>
