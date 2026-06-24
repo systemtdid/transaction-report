@@ -6,7 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -25,6 +27,15 @@ public class GlobalExceptionHandler {
     public String handleIllegalArg(IllegalArgumentException ex, Model model) {
         model.addAttribute("error", ex.getMessage());
         return "error";
+    }
+
+    // Missing static resources (e.g. the browser's automatic /favicon.ico request)
+    // are not errors — return a plain 404 without logging or rendering the error page.
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ResponseBody
+    public void handleNoResource(NoResourceFoundException ex) {
+        // no-op: empty 404 response
     }
 
     @ExceptionHandler(Exception.class)
