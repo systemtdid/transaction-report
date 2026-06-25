@@ -104,7 +104,7 @@
                 <option value="">— Select organization —</option>
                 <option th:each="org : ${orgs}"
                         th:value="${org.orgId}"
-                        th:text="${org.displayName + ' (' + org.orgId + ')'}">Org Name</option>
+                        th:text="${org.displayName == org.orgId ? org.orgId : org.displayName + ' (' + org.orgId + ')'}">Org Name</option>
             </select>
         </div>
 

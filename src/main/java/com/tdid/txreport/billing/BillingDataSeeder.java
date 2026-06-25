@@ -100,6 +100,12 @@ public class BillingDataSeeder {
             throw new IllegalStateException(
                     "Org " + c.orgId() + " must have exactly one unbounded (null) tier; found " + unbounded);
         }
+        if (c.minimumFee() != null && c.minimumFee().signum() < 0) {
+            throw new IllegalStateException("Org " + c.orgId() + " has a negative minimumFee");
+        }
+        if (c.fixedMonthlyFee() != null && c.fixedMonthlyFee().signum() < 0) {
+            throw new IllegalStateException("Org " + c.orgId() + " has a negative fixedMonthlyFee");
+        }
     }
 
     // ---- internal JSON shapes; tierNumber is assigned by the seeder, not the file ----

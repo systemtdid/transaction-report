@@ -43,6 +43,23 @@ public class TransactionRepository {
         return result != null ? result : 0L;
     }
 
+    /** orgIDs that have billable (SUCCESS, signing) transactions, busiest first — for the org dropdown. */
+    public List<String> findOrgIdsWithData() {
+        List<Object> params = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+                "SELECT orgID FROM transactions WHERE tranStatus = 'SUCCESS'");
+        appendSigningFilter(sql, params);
+        sql.append(" GROUP BY orgID ORDER BY COUNT(*) DESC");
+        return jdbc.queryForList(sql.toString(), String.class, params.toArray());
+    }
+
+    /** Whether any transaction exists for this org (cheap, index-backed existence check). */
+    public boolean existsByOrgId(String orgId) {
+        Boolean exists = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM transactions WHERE orgID = ?)", Boolean.class, orgId);
+        return Boolean.TRUE.equals(exists);
+    }
+
     public List<DailyCount> countSuccessByDay(String orgId, String gatewayId,
                                                LocalDate monthStart, LocalDate endExclusive) {
         List<Object> params = new ArrayList<>();
