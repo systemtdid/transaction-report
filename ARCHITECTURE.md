@@ -444,6 +444,188 @@ BigDecimal totalFee(List<MonthlyTierLine> lines)
 - All `BigDecimal`, scale 2, HALF_UP.
 - **Verified invariant:** tier-1 rate `0.70`, `89,741 → 62,818.70`.
 
+> **Superseded by the dynamic Billing Engine — see §8.5.** `FeeCalculator`,
+> `FeeSchedule`, and the old `domain.FeeTier (from,to,rate)` describe the original
+> hardcoded, single-model billing. The Billing Engine generalises this into a
+> data-driven engine supporting five pricing logics. New work targets §8.5.
+
+---
+
+## 8.5 Dynamic Billing Engine (data-driven, supersedes §8.4)
+
+**Goal:** price each organisation's monthly usage from **declarative configuration**
+rather than hardcoded tiers, so new pricing models are added by editing data — not
+code. One engine must satisfy **five composable business logics**:
+
+1. **Progressive Tiered Pricing** — usage fills tiers in order; each tier charges
+   `unitsInTier × rate` (tax-bracket style).
+2. **Free Tier (Zero Rating)** — a tier whose `rate = 0.00`; the leading N units cost
+   nothing (e.g. Tokio Marine: first 50,000 free).
+3. **Minimum Fee Guarantee** — bill `max(computedFee, minimumFee)`; the invoice never
+   drops below a floor (e.g. Muang Thai: ≥ 42,000.00).
+4. **Fixed Monthly Fee** — a flat platform fee **added** to the usage-based fee
+   (e.g. Krungthai Bank: +30,000.00/month). *(Additive — see Open Questions.)*
+5. **Minimum Limit Waive** — if usage has not reached the contractual minimum, the
+   whole invoice is waived to `0.00` (e.g. Prudential, Dhipaya). This is the
+   generalised form of the existing "below-minimum" rule in §8.3.
+
+These compose: a single org config may combine several (the engine evaluates all,
+in the fixed order below). New code lives in a new package
+**`com.tdid.txreport.billing`** (the new `billing.FeeTier` replaces the old
+`domain.FeeTier`; `FeeSchedule`/`FeeCalculator` are retired during migration).
+
+### 8.5.1 Data models (Java 21 records)
+
+```java
+// One pricing band. maxCapacity = WIDTH of the band (units it can hold),
+// NOT a cumulative ceiling. The final tier has maxCapacity == null (unbounded).
+public record FeeTier(int tierNumber, Long maxCapacity, BigDecimal rate) {
+    public boolean isUnbounded() { return maxCapacity == null; }
+    public boolean isFree()      { return rate.signum() == 0; }   // zero rating
+}
+
+// Declarative per-org pricing. Any of minimumFee / fixedMonthlyFee may be null
+// (= logic not applied). Tiers are ordered tier 1 → N.
+public record OrgBillingConfig(
+        String orgId,
+        String orgName,
+        BigDecimal minimumFee,        // nullable → Minimum Fee Guarantee
+        BigDecimal fixedMonthlyFee,   // nullable → Fixed Monthly Fee
+        boolean waiveIfBelowMinimum,  //         → Minimum Limit Waive
+        List<FeeTier> tiers) {
+
+    public boolean hasMinimumFee()      { return minimumFee != null; }
+    public boolean hasFixedMonthlyFee() { return fixedMonthlyFee != null; }
+
+    // Threshold for the waive rule. ASSUMPTION: the contractual minimum equals
+    // the first tier's capacity (see Open Questions §8.5.5).
+    public long minimumLimit() {
+        return (tiers.isEmpty() || tiers.get(0).maxCapacity() == null)
+                ? 0L : tiers.get(0).maxCapacity();
+    }
+}
+
+// Per-tier outcome → maps 1:1 to the monthly report's tier-table rows.
+public record TierCharge(int tierNumber, Long maxCapacity,
+                         BigDecimal rate, long unitsInTier, BigDecimal charge) {}
+
+// Full billing outcome for one org/period.
+public record BillingResult(
+        String orgId,
+        long usage,
+        List<TierCharge> tierBreakdown,
+        BigDecimal tieredFee,        // Σ tier charges
+        BigDecimal fixedMonthlyFee,  // applied fixed fee (0.00 if none)
+        BigDecimal computedFee,      // tieredFee + fixedMonthlyFee (pre-guarantee/waive)
+        BigDecimal billedFee,        // FINAL amount invoiced
+        boolean minimumFeeApplied,   // true if the guarantee floor raised the fee
+        boolean waived,              // true if the minimum-limit waive zeroed it
+        String remark) {}            // e.g. below-minimum message, else null
+```
+
+> **Money:** every `BigDecimal` is scale 2, `RoundingMode.HALF_UP` (consistent with
+> §6). Rates may carry more precision (e.g. KTB `0.4280`); only the *charge* is
+> rounded to scale 2.
+
+### 8.5.2 `BillingEngineService` (the engine)
+
+```java
+BillingResult calculate(OrgBillingConfig config, long usage)
+```
+
+**Deterministic pipeline** (every logic evaluated, in this order):
+
+```text
+1. TIERED   tieredFee = 0; remaining = usage
+            for each tier (1..N):
+                units = tier.isUnbounded() ? remaining
+                                           : min(remaining, tier.maxCapacity)
+                charge = round2(units × tier.rate)     // Free Tier ⇒ rate 0 ⇒ 0.00
+                record TierCharge(...); tieredFee += charge; remaining -= units
+                if remaining == 0 break
+2. FIXED    computedFee = tieredFee + (config.fixedMonthlyFee ?: 0)      // logic 4
+3. FLOOR    guaranteed  = config.hasMinimumFee()                         // logic 3
+                          ? computedFee.max(config.minimumFee) : computedFee
+            minimumFeeApplied = guaranteed > computedFee
+4. WAIVE    if config.waiveIfBelowMinimum && usage < config.minimumLimit(): // logic 5
+                billedFee = 0.00; waived = true; remark = BELOW_MIN_REMARK
+            else:
+                billedFee = guaranteed; waived = false
+```
+
+- **Progressive Tiered (1)** and **Free Tier (2)** are the same loop — a free tier is
+  simply `rate = 0`, so no special-casing is needed.
+- **Waive (4) wins** over the guarantee/fixed fee (final override → `0.00`). For the
+  eight target orgs no org combines *waive* with *minimumFee/fixedMonthlyFee*, so the
+  ordering is unambiguous; defining it keeps the engine deterministic for future configs.
+- The service is **stateless** and pure (no DB, no clock) → trivially unit-testable;
+  feed `(config, usage)` and assert `BillingResult`. `MonthlyReportService` (§8.3)
+  becomes a thin caller: resolve config → get `usage` from the repo → `calculate` →
+  map `tierBreakdown`/`billedFee`/`remark` onto `MonthlyReportData`.
+
+### 8.5.3 Data initialization (load configs into memory)
+
+Configs are loaded **once at startup** into an in-memory store behind a repository
+interface, so the pricing source can change later without touching the engine.
+
+```text
+billing/
+  BillingConfigRepository           (interface)
+      Optional<OrgBillingConfig> findByOrgId(String orgId)
+      List<OrgBillingConfig>     findAll()
+  InMemoryBillingConfigRepository   (holds Map<String,OrgBillingConfig>)
+  BillingDataSeeder                 (ApplicationRunner / @PostConstruct)
+      → reads classpath:billing/org-billing-config.json
+      → deserialises to List<OrgBillingConfig> (Jackson)
+      → assigns tierNumber by list order, validates, populates the repository
+```
+
+- **Source of truth:** `src/main/resources/billing/org-billing-config.json` — the exact
+  8-org JSON supplied (field names map directly to `OrgBillingConfig`). Editing pricing
+  = editing this file; no recompile of logic.
+- **Validation at load:** non-empty tiers; exactly one unbounded (`null`) tier and it
+  must be **last**; rates ≥ 0; `orgId` unique. Fail fast on a bad config.
+- **Swap-in path:** because the engine depends only on `BillingConfigRepository`, a
+  future `JdbcBillingConfigRepository` backed by the `feereport` table (§2.3) can replace
+  the in-memory + JSON loader with **zero change** to `BillingEngineService`.
+
+### 8.5.4 The eight supported organisations
+
+| Organisation | orgId | Tiered | Free tier | Min-fee floor | Fixed monthly | Waive |
+|---|---|:--:|:--:|:--:|:--:|:--:|
+| Prudential Life Assurance | 0107537001897 | ✓ | – | – | – | ✓ |
+| Tokio Marine Life Insurance | 0107540000103 | ✓ | ✓ (50k@0) | – | – | ✓ |
+| Muang Thai Insurance | 0107551000151 | ✓ | – | ✓ 42,000.00 | – | – |
+| Dhipaya Life Assurance | 0107556000051 | ✓ | ✓ (240k@0) | – | – | ✓ |
+| BCI (Thailand) | 0125562016973 | ✓ | ✓ (30k@0) | – | – | ✓ |
+| Government Savings Bank | 0994000164891 | ✓ | – | ✓ 0.00* | – | – |
+| Krungthai Bank | 0107537000882 | ✓ | – | – | ✓ 30,000.00 | – |
+| Advanced Digital Distribution | 0105561025634 | ✓ | – | ✓ 28,000.00 | – | – |
+
+\* GSB's `minimumFee = 0.00` is an explicit **zero floor** (a no-op guarantee); kept
+for config symmetry. Every org uses Progressive Tiered as its base.
+
+### 8.5.5 Assumptions & open questions — **[CONFIRM]**
+
+1. **`maxCapacity` = tier width, not cumulative ceiling.** Confirmed by Prudential
+   (`720000 ×4` repeated) — repeated values only make sense as widths. The engine
+   treats them as widths.
+2. **Minimum-limit threshold for the waive rule = first tier's capacity.** The supplied
+   JSON has `waiveIfBelowMinimum` (boolean) but **no explicit threshold**. We derive it
+   from `tiers[0].maxCapacity` (e.g. Prudential 720,000; Dhipaya 240,000). **Confirm**
+   this is correct, or add an explicit `minimumCommitment` field to the config.
+3. **Waive compares against *which* usage — monthly or accumulated YTD?** §8.3's original
+   rule compared **accumulated** YTD usage to the minimum. The JSON is silent. Default
+   assumption: compare the **report period's usage**; **confirm** vs. accumulated.
+4. **Fixed Monthly Fee is additive** (`tiered + fixed`). Krungthai has both a fixed fee
+   and tiers, so additive is the natural reading — **confirm** it isn't an alternative
+   (either/or) model.
+5. **orgIds vs. live data.** 6 of 8 orgIds exist in the imported `fmsv_db`
+   (Tokio/Dhipaya/BCI/GSB/Krungthai/Advanced); **Prudential `0107537001897`** and
+   **Muang Thai `0107551000151`** are **not** in the current dataset — their reports
+   will be empty until data exists. Note: `0107537001897` (Prudential) is one digit off
+   the real Krungthai `0107537000882` — **confirm** it's not a typo.
+
 ---
 
 ## 9. PDF rendering layer
