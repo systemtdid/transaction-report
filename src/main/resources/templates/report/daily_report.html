@@ -30,7 +30,7 @@
         <div style="font-size: 12pt; margin-bottom: 8pt;" th:text="'For ' + ${data.org.displayName}">For Government Saving Bank</div>
         <div style="font-size: 12pt; margin-bottom: 12pt;" th:text="'As of ' + ${#temporals.format(data.period.atDay(1), 'MMMM, yyyy')}">As of March, 2026</div>
         <div style="font-size: 12pt;">
-            Organization:&#160;&#160;&#160;&#160;<span th:text="${data.org.orgId}">0994000164891</span>
+            Organization:&#160;&#160;&#160;&#160;<span th:text="${data.org.organizations}">Government Saving Bank - 0994000164891</span>
         </div>
     </div>
 

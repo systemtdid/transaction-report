@@ -30,9 +30,8 @@ public class TransactionRepository {
                              LocalDateTime startInclusive, LocalDateTime endExclusive) {
         List<Object> params = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-                "SELECT COUNT(tranID) FROM transactions " +
-                "WHERE orgID = ? AND tranStatus = 'SUCCESS'");
-        params.add(orgId);
+                "SELECT COUNT(tranID) FROM transactions WHERE tranStatus = 'SUCCESS'");
+        appendOrgFilter(sql, params, orgId);
         appendSigningFilter(sql, params);
         sql.append(" AND processedTime >= ? AND processedTime < ?");
         params.add(startInclusive);
@@ -43,31 +42,13 @@ public class TransactionRepository {
         return result != null ? result : 0L;
     }
 
-    /** orgIDs that have billable (SUCCESS, signing) transactions, busiest first — for the org dropdown. */
-    public List<String> findOrgIdsWithData() {
-        List<Object> params = new ArrayList<>();
-        StringBuilder sql = new StringBuilder(
-                "SELECT orgID FROM transactions WHERE tranStatus = 'SUCCESS'");
-        appendSigningFilter(sql, params);
-        sql.append(" GROUP BY orgID ORDER BY COUNT(*) DESC");
-        return jdbc.queryForList(sql.toString(), String.class, params.toArray());
-    }
-
-    /** Whether any transaction exists for this org (cheap, index-backed existence check). */
-    public boolean existsByOrgId(String orgId) {
-        Boolean exists = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM transactions WHERE orgID = ?)", Boolean.class, orgId);
-        return Boolean.TRUE.equals(exists);
-    }
-
     public List<DailyCount> countSuccessByDay(String orgId, String gatewayId,
                                                LocalDate monthStart, LocalDate endExclusive) {
         List<Object> params = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
                 "SELECT DATE(processedTime) AS d, COUNT(tranID) AS c " +
-                "FROM transactions " +
-                "WHERE orgID = ? AND tranStatus = 'SUCCESS'");
-        params.add(orgId);
+                "FROM transactions WHERE tranStatus = 'SUCCESS'");
+        appendOrgFilter(sql, params, orgId);
         appendSigningFilter(sql, params);
         sql.append(" AND processedTime >= ? AND processedTime < ?");
         params.add(monthStart.atStartOfDay());
@@ -83,6 +64,42 @@ public class TransactionRepository {
         });
     }
 
+    /** Gateway IDs that have billable (SUCCESS, signing) transactions, busiest first — for the dropdown. */
+    public List<String> findGatewayIdsWithData() {
+        List<Object> params = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+                "SELECT gatewayID FROM transactions WHERE tranStatus = 'SUCCESS' AND gatewayID <> ''");
+        appendSigningFilter(sql, params);
+        sql.append(" GROUP BY gatewayID ORDER BY COUNT(*) DESC");
+        return jdbc.queryForList(sql.toString(), String.class, params.toArray());
+    }
+
+    /** All orgIDs (signing SUCCESS) routed through a gateway, busiest first (first = representative). */
+    public List<String> findOrgIdsForGateway(String gatewayId) {
+        List<Object> params = new ArrayList<>();
+        params.add(gatewayId);
+        StringBuilder sql = new StringBuilder(
+                "SELECT orgID FROM transactions WHERE tranStatus = 'SUCCESS' AND gatewayID = ?");
+        appendSigningFilter(sql, params);
+        sql.append(" GROUP BY orgID ORDER BY COUNT(*) DESC");
+        return jdbc.queryForList(sql.toString(), String.class, params.toArray());
+    }
+
+    /** Whether any transaction exists for this gateway (cheap existence check). */
+    public boolean existsGateway(String gatewayId) {
+        Boolean exists = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM transactions WHERE gatewayID = ?)", Boolean.class, gatewayId);
+        return Boolean.TRUE.equals(exists);
+    }
+
+    /** Optional orgID filter (skipped when null/blank, e.g. gateway-scoped reports). */
+    private void appendOrgFilter(StringBuilder sql, List<Object> params, String orgId) {
+        if (orgId != null && !orgId.isBlank()) {
+            sql.append(" AND orgID = ?");
+            params.add(orgId);
+        }
+    }
+
     /** Restrict to signing transactions (PDFsign/XMLsign/JsonSign) per configured function IDs. */
     private void appendSigningFilter(StringBuilder sql, List<Object> params) {
         if (signingFunctionIds == null || signingFunctionIds.isEmpty()) {
@@ -95,7 +112,7 @@ public class TransactionRepository {
         params.addAll(signingFunctionIds);
     }
 
-    /** The report is counted by gatewayID — applied whenever the org has one configured. */
+    /** The report is counted by gatewayID — applied whenever one is given. */
     private void appendGatewayFilter(StringBuilder sql, List<Object> params, String gatewayId) {
         if (gatewayId != null && !gatewayId.isBlank()) {
             sql.append(" AND gatewayID = ?");

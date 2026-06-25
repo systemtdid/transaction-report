@@ -26,24 +26,24 @@ public class ReportController {
 
     @GetMapping("/")
     public String index(Model model) {
-        model.addAttribute("orgs", reportService.listOrgs());
+        model.addAttribute("gateways", reportService.listGateways());
         return "index";
     }
 
     @GetMapping("/report")
     public ResponseEntity<byte[]> download(
-            @RequestParam String orgId,
+            @RequestParam String gatewayId,
             @RequestParam String type,
             @RequestParam(required = false) String period) {
 
         ReportType reportType = parseType(type);
         YearMonth yearMonth = parsePeriod(period);
 
-        byte[] pdf = reportService.generate(orgId, reportType, yearMonth);
+        byte[] pdf = reportService.generate(gatewayId, reportType, yearMonth);
 
         String periodStr = yearMonth != null ? yearMonth.toString()
                 : YearMonth.now().toString();
-        String filename = type.toLowerCase() + "_" + orgId + "_" + periodStr + ".pdf";
+        String filename = type.toLowerCase() + "_" + gatewayId + "_" + periodStr + ".pdf";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);

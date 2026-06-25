@@ -49,11 +49,12 @@ public class MonthlyReportService {
         LocalDateTime start = monthStart.atStartOfDay();
         LocalDateTime end = endExclusive.atStartOfDay();
 
-        long usage = repo.countSuccess(org.orgId(), org.gatewayId(), start, end);
+        // Gateway-scoped usage: count all transactions through the gateway (org filter omitted).
+        long usage = repo.countSuccess(null, org.gatewayId(), start, end);
 
         // Accumulated = year-to-date in the same calendar year (display only).
         LocalDateTime yearStart = LocalDate.of(period.getYear(), 1, 1).atStartOfDay();
-        long accumulated = repo.countSuccess(org.orgId(), org.gatewayId(), yearStart, end);
+        long accumulated = repo.countSuccess(null, org.gatewayId(), yearStart, end);
 
         List<MonthlyTierLine> lines;
         BigDecimal tieredTotal;     // sum of the tier rows (the tier-table Total)

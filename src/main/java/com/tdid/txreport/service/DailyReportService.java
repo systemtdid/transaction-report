@@ -27,8 +27,9 @@ public class DailyReportService {
         LocalDate monthStart = period.atDay(1);
         LocalDate endExclusive = period.plusMonths(1).atDay(1);
 
+        // Gateway-scoped: count all transactions through the gateway (org filter omitted).
         List<DailyCount> dbRows = repo.countSuccessByDay(
-                org.orgId(), org.gatewayId(), monthStart, endExclusive);
+                null, org.gatewayId(), monthStart, endExclusive);
 
         // Index DB results by date for fast lookup
         Map<LocalDate, Long> countByDate = dbRows.stream()

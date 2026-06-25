@@ -46,7 +46,7 @@ public class OrgRegistryProperties {
         public void setGatewayId(String gatewayId) { this.gatewayId = gatewayId; }
 
         OrgProfile toProfile() {
-            return new OrgProfile(orgId, displayName, gatewayId);
+            return new OrgProfile(orgId, displayName, gatewayId, null);
         }
     }
 }
