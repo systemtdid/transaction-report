@@ -14,6 +14,8 @@ spring:
 
 txreport:
   default-zone: Asia/Bangkok
+  # Signing transactions counted in reports: PDFsign=1, XMLsign=4, JsonSign=14
+  signing-function-ids: 1,4,14
   fonts:
     noto: ${FONT_NOTO:}
     tahoma: ${FONT_TAHOMA:/mnt/c/Windows/Fonts/tahoma.ttf}
@@ -21,13 +23,15 @@ txreport:
   orgs:
     - org-id: "0994000164891"
       display-name: "Government Saving Bank"
-      gateway-id: "TIPxGSB01"
+      gateway-id: "TIPxGSBTest01"
     - org-id: "0107537000882"
       display-name: "Krung Thai Bank"
+      gateway-id: "KTBTest01"
     - org-id: "0994000953534"
       display-name: "TMC"
     - org-id: "0107556000051"
       display-name: "DHIP"
+      gateway-id: "DhipTest01"
       fee-schedule:
         minimum-transactions: 720000
         tiers:
