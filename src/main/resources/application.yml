@@ -32,14 +32,8 @@ txreport:
     - org-id: "0107556000051"
       display-name: "DHIP"
       gateway-id: "DhipTest01"
-      fee-schedule:
-        minimum-transactions: 720000
-        tiers:
-          - { from: 1,       to: 720000,   rate: 0.70 }
-          - { from: 720001,  to: 1440000,  rate: 0.65 }
-          - { from: 1440001, to: 2160000,  rate: 0.60 }
-          - { from: 2160001, to: 2880000,  rate: 0.55 }
-          - { from: 2880001, to: null,     rate: 0.50 }
+  # Billing (tiers, minimum fee, fixed fee, waive) is configured per org in the
+  # Billing Engine: src/main/resources/billing/org-billing-config.json
 
 logging:
   level:

@@ -95,7 +95,7 @@ public class ReportService {
         String name = billingConfigRepo.findByOrgId(orgId)
                 .map(c -> c.orgName())
                 .orElse(orgId);
-        return new OrgProfile(orgId, name, null, null);
+        return new OrgProfile(orgId, name, null);
     }
 
     private YearMonth resolveDefaultPeriod(ReportType type, YearMonth period) {

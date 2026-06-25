@@ -57,7 +57,7 @@
         </tr>
     </table>
 
-    <div th:if="${data.org.hasFeeSchedule()}">
+    <div th:if="${not #lists.isEmpty(data.lines)}">
         <table style="width: 90%; margin: 0 auto; text-align: center; font-size: 10pt;">
             <thead>
                 <tr>
@@ -69,8 +69,8 @@
             </thead>
             <tbody>
                 <tr th:each="line, stat : ${data.lines}">
-                    <td style="border: 1pt solid #000; padding: 6pt;" th:text="${line.tier.displayRange()}">1-720,000</td>
-                    <td style="border: 1pt solid #000; padding: 6pt;" th:text="${#numbers.formatDecimal(line.tier.rate(), 1, 'COMMA', 2, 'POINT')}">0.70</td>
+                    <td style="border: 1pt solid #000; padding: 6pt;" th:text="${line.rangeLabel}">1-720,000</td>
+                    <td style="border: 1pt solid #000; padding: 6pt;" th:text="${#numbers.formatDecimal(line.rate, 1, 'COMMA', 2, 'POINT')}">0.70</td>
                     <td style="border: 1pt solid #000; padding: 6pt;" th:text="${#numbers.formatInteger(line.usageCount, 1, 'COMMA')}">55,267</td>
                     <td style="border: 1pt solid #000; padding: 6pt;" th:text="${#numbers.formatDecimal(line.fee, 1, 'COMMA', 2, 'POINT')}">38,686.90</td>
                 </tr>
@@ -95,12 +95,26 @@
             <td style="width: 5%; border: none; text-align: center; padding-bottom: 12pt;">:</td>
             <td style="width: 60%; border: none; font-weight: bold; padding-bottom: 12pt;" th:text="${#numbers.formatInteger(data.totalUsage, 1, 'COMMA')}">55,267</td>
         </tr>
+        <tr th:if="${not #lists.isEmpty(data.lines)}">
+            <td style="border: none; padding-bottom: 12pt;">Tier Fee (Baht)</td>
+            <td style="border: none; text-align: center; padding-bottom: 12pt;">:</td>
+            <td style="border: none; padding-bottom: 12pt;" th:text="${#numbers.formatDecimal(data.computedFee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+        </tr>
+        <tr th:if="${data.fixedMonthlyFee.signum() > 0}">
+            <td style="border: none; padding-bottom: 12pt;">Fixed Monthly Fee (Baht)</td>
+            <td style="border: none; text-align: center; padding-bottom: 12pt;">:</td>
+            <td style="border: none; padding-bottom: 12pt;" th:text="${#numbers.formatDecimal(data.fixedMonthlyFee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+        </tr>
         <tr>
-            <td style="width: 35%; border: none; padding-bottom: 12pt;">Total Invoice Amount (Baht)</td>
-            <td style="width: 5%; border: none; text-align: center; padding-bottom: 12pt;">:</td>
-            <td style="width: 60%; border: none; padding-bottom: 12pt;" th:text="${#numbers.formatDecimal(data.billedFee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+            <td style="border: none; padding-bottom: 12pt;">Total Invoice Amount (Baht)</td>
+            <td style="border: none; text-align: center; padding-bottom: 12pt;">:</td>
+            <td style="border: none; font-weight: bold; padding-bottom: 12pt;" th:text="${#numbers.formatDecimal(data.billedFee, 1, 'COMMA', 2, 'POINT')}">0.00</td>
         </tr>
     </table>
+
+    <div th:if="${data.minimumFeeApplied}" style="width: 90%; margin: 0 auto 10pt auto; font-size: 9pt; font-style: italic; color: #555;">
+        (Minimum fee guarantee applied — invoice raised to the contractual minimum.)
+    </div>
 
     <div class="remark" th:if="${data.belowMinimum}" style="width: 90%; margin: 10pt auto; font-size: 10pt; color: #333;">
         Remark : <span th:text="${data.remark}">Number of usage transaction has not the minimum limit</span>
