@@ -447,32 +447,37 @@ BigDecimal totalFee(List<MonthlyTierLine> lines)
 > **Superseded by the dynamic Billing Engine — see §8.5.** `FeeCalculator`,
 > `FeeSchedule`, and the old `domain.FeeTier (from,to,rate)` describe the original
 > hardcoded, single-model billing. The Billing Engine generalises this into a
-> data-driven engine supporting five pricing logics. New work targets §8.5.
+> data-driven engine supporting cycle/prepaid/cap/tier/base/min/waive rules. New work targets §8.5.
 
 ---
 
 ## 8.5 Dynamic Billing Engine (data-driven, supersedes §8.4)
 
-**Goal:** price each organisation's monthly usage from **declarative configuration**
-rather than hardcoded tiers, so new pricing models are added by editing data — not
-code. One engine must satisfy **five composable business logics**:
+**Goal:** price each organisation's usage from **declarative configuration** rather than
+hardcoded tiers, so new pricing models are added by editing data — not code. The engine
+takes a config, the **period usage** and the **year-to-date accumulated usage**, and
+applies these composable rules in a fixed order:
 
-1. **Progressive Tiered Pricing** — usage fills tiers in order; each tier charges
-   `unitsInTier × rate` (tax-bracket style).
-2. **Free Tier (Zero Rating)** — a tier whose `rate = 0.00`; the leading N units cost
-   nothing (e.g. Tokio Marine: first 50,000 free).
-3. **Minimum Fee Guarantee** — bill `max(computedFee, minimumFee)`; the invoice never
-   drops below a floor (e.g. Muang Thai: ≥ 42,000.00).
-4. **Fixed Monthly Fee** — a flat platform fee **added** to the usage-based fee
-   (e.g. Krungthai Bank: +30,000.00/month). *(Additive — see Open Questions.)*
-5. **Minimum Limit Waive** — if usage has not reached the contractual minimum, the
-   whole invoice is waived to `0.00` (e.g. Prudential, Dhipaya). This is the
-   generalised form of the existing "below-minimum" rule in §8.3.
+1. **Prepaid Quota** — the first `prepaidQuota` transactions of the *year* are free; only
+   the annual excess is billable (e.g. Prudential: 514,285 prepaid).
+2. **Annual Max Cap** — at most `annualMaxCap` billable transactions per *year*
+   (e.g. GSB: 226,000).
+3. **Billing Cycle** — `MONTHLY` bills this period's *new* billable transactions; `YEARLY`
+   bills the whole year-to-date billable.
+4. **Progressive Tiered Pricing** — billable usage fills tiers in order, each charging
+   `unitsInTier × rate`. A **Free Tier** is simply a tier with `rate = 0.00`
+   (e.g. Tokio Marine: first 50,000 free).
+5. **Base Fee** — a flat fee **added** to the tier fee, any cycle (e.g. KTB +30,000;
+   BCI +100,000/yr).
+6. **Minimum Fee Guarantee** — bill `max(computedFee, minimumFee)`; never below the floor
+   (e.g. Muang Thai ≥ 42,000).
+7. **Minimum Limit Waive** — while YTD usage is below the contractual minimum, the whole
+   invoice is waived to `0.00` (e.g. Prudential, Dhipaya).
 
-These compose: a single org config may combine several (the engine evaluates all,
-in the fixed order below). New code lives in a new package
-**`com.tdid.txreport.billing`** (the new `billing.FeeTier` replaces the old
-`domain.FeeTier`; `FeeSchedule`/`FeeCalculator` are retired during migration).
+Rules 1–2 derive the *billable transaction count*; rule 3 picks the period basis; rules
+4–7 turn that into money. A single org may combine several. Code lives in package
+**`com.tdid.txreport.billing`**; the old `FeeCalculator`/`FeeSchedule`/`domain.FeeTier`
+are retired (§8.4 superseded).
 
 ### 8.5.1 Data models (Java 21 records)
 
@@ -484,21 +489,28 @@ public record FeeTier(int tierNumber, Long maxCapacity, BigDecimal rate) {
     public boolean isFree()      { return rate.signum() == 0; }   // zero rating
 }
 
-// Declarative per-org pricing. Any of minimumFee / fixedMonthlyFee may be null
-// (= logic not applied). Tiers are ordered tier 1 → N.
+public enum BillingCycle { MONTHLY, YEARLY }
+
+// Declarative per-org pricing. Optional fields (null) switch that logic off.
+// Tiers are ordered tier 1 → N.
 public record OrgBillingConfig(
         String orgId,
         String orgName,
+        BillingCycle billingCycle,    // MONTHLY bills the month; YEARLY bills YTD
+        BigDecimal baseFee,           // nullable → Base Fee (additive)
         BigDecimal minimumFee,        // nullable → Minimum Fee Guarantee
-        BigDecimal fixedMonthlyFee,   // nullable → Fixed Monthly Fee
+        Long prepaidQuota,            // nullable → first N txns/year free
+        Long annualMaxCap,            // nullable → ≤ N billable txns/year
         boolean waiveIfBelowMinimum,  //         → Minimum Limit Waive
         List<FeeTier> tiers) {
 
-    public boolean hasMinimumFee()      { return minimumFee != null; }
-    public boolean hasFixedMonthlyFee() { return fixedMonthlyFee != null; }
+    public boolean hasBaseFee()      { return baseFee != null; }
+    public boolean hasMinimumFee()   { return minimumFee != null; }
+    public boolean hasPrepaidQuota() { return prepaidQuota != null; }
+    public boolean hasAnnualMaxCap() { return annualMaxCap != null; }
+    public boolean isYearly()        { return billingCycle == BillingCycle.YEARLY; }
 
-    // Threshold for the waive rule. ASSUMPTION: the contractual minimum equals
-    // the first tier's capacity (see Open Questions §8.5.5).
+    // Waive threshold = the first tier's capacity (see Open Questions §8.5.5).
     public long minimumLimit() {
         return (tiers.isEmpty() || tiers.get(0).maxCapacity() == null)
                 ? 0L : tiers.get(0).maxCapacity();
@@ -509,18 +521,21 @@ public record OrgBillingConfig(
 public record TierCharge(int tierNumber, Long maxCapacity,
                          BigDecimal rate, long unitsInTier, BigDecimal charge) {}
 
-// Full billing outcome for one org/period.
+// Full billing outcome for one invoice.
 public record BillingResult(
         String orgId,
-        long usage,
+        BillingCycle billingCycle,
+        long periodUsage,            // transactions in the billing period
+        long accumulatedUsage,       // transactions year-to-date (incl. this period)
+        long billableUsage,          // tiered count after prepaid quota / annual cap
         List<TierCharge> tierBreakdown,
         BigDecimal tieredFee,        // Σ tier charges
-        BigDecimal fixedMonthlyFee,  // applied fixed fee (0.00 if none)
-        BigDecimal computedFee,      // tieredFee + fixedMonthlyFee (pre-guarantee/waive)
+        BigDecimal baseFee,          // applied base fee (0.00 if none)
+        BigDecimal computedFee,      // tieredFee + baseFee (pre-floor/waive)
         BigDecimal billedFee,        // FINAL amount invoiced
-        boolean minimumFeeApplied,   // true if the guarantee floor raised the fee
-        boolean waived,              // true if the minimum-limit waive zeroed it
-        String remark) {}            // e.g. below-minimum message, else null
+        boolean minimumFeeApplied,
+        boolean waived,
+        String remark) {}
 ```
 
 > **Money:** every `BigDecimal` is scale 2, `RoundingMode.HALF_UP` (consistent with
@@ -530,38 +545,34 @@ public record BillingResult(
 ### 8.5.2 `BillingEngineService` (the engine)
 
 ```java
-BillingResult calculate(OrgBillingConfig config, long usage)
+BillingResult calculate(OrgBillingConfig config, long periodUsage, long accumulatedUsage)
 ```
 
-**Deterministic pipeline** (every logic evaluated, in this order):
+**Deterministic pipeline:**
 
 ```text
-1. TIERED   tieredFee = 0; remaining = usage
-            for each tier (1..N):
-                units = tier.isUnbounded() ? remaining
-                                           : min(remaining, tier.maxCapacity)
-                charge = round2(units × tier.rate)     // Free Tier ⇒ rate 0 ⇒ 0.00
-                record TierCharge(...); tieredFee += charge; remaining -= units
-                if remaining == 0 break
-2. FIXED    computedFee = tieredFee + (config.fixedMonthlyFee ?: 0)      // logic 4
-3. FLOOR    guaranteed  = config.hasMinimumFee()                         // logic 3
-                          ? computedFee.max(config.minimumFee) : computedFee
-            minimumFeeApplied = guaranteed > computedFee
-4. WAIVE    if config.waiveIfBelowMinimum && usage < config.minimumLimit(): // logic 5
-                billedFee = 0.00; waived = true; remark = BELOW_MIN_REMARK
-            else:
-                billedFee = guaranteed; waived = false
+billableOf(accum) = (prepaidQuota ? max(0, accum − prepaidQuota) : accum)
+                    then (annualMaxCap ? min(., annualMaxCap) : .)
+
+1. BILLABLE  through = billableOf(accumulatedUsage)
+             before  = billableOf(accumulatedUsage − periodUsage)
+             billableUsage = isYearly ? through : max(0, through − before)   // logics 1–3
+2. TIERED    fill tiers with billableUsage → tieredFee (free tier ⇒ rate 0)  // logic 4
+3. BASE      computedFee = tieredFee + (config.baseFee ?: 0)                 // logic 5
+4. FLOOR     guaranteed = hasMinimumFee ? computedFee.max(minimumFee) : computedFee  // logic 6
+5. WAIVE     if waiveIfBelowMinimum && accumulatedUsage < minimumLimit():    // logic 7
+                 billedFee = 0.00; waived = true; remark = BELOW_MIN_REMARK
+             else billedFee = guaranteed
 ```
 
-- **Progressive Tiered (1)** and **Free Tier (2)** are the same loop — a free tier is
-  simply `rate = 0`, so no special-casing is needed.
-- **Waive (4) wins** over the guarantee/fixed fee (final override → `0.00`). For the
-  eight target orgs no org combines *waive* with *minimumFee/fixedMonthlyFee*, so the
-  ordering is unambiguous; defining it keeps the engine deterministic for future configs.
-- The service is **stateless** and pure (no DB, no clock) → trivially unit-testable;
-  feed `(config, usage)` and assert `BillingResult`. `MonthlyReportService` (§8.3)
-  becomes a thin caller: resolve config → get `usage` from the repo → `calculate` →
-  map `tierBreakdown`/`billedFee`/`remark` onto `MonthlyReportData`.
+- **Tiering basis:** MONTHLY tiers the month's *new* billable (tiers reset per month);
+  YEARLY tiers the full-year billable.
+- **Waive wins** (final override → `0.00`), checked against **accumulated YTD** usage
+  (matching §8.3's original below-minimum rule) — so it can also zero an org's base fee.
+- The service is **stateless/pure** (no DB, no clock) → unit-tested: feed
+  `(config, periodUsage, accumulatedUsage)`, assert `BillingResult` (10 tests).
+  `MonthlyReportService` (§8.3) is a thin caller: resolve config → period + YTD usage
+  from the repo → `calculate` → map onto `MonthlyReportData`.
 
 ### 8.5.3 Data initialization (load configs into memory)
 
@@ -580,51 +591,49 @@ billing/
       → assigns tierNumber by list order, validates, populates the repository
 ```
 
-- **Source of truth:** `src/main/resources/billing/org-billing-config.json` — the exact
-  8-org JSON supplied (field names map directly to `OrgBillingConfig`). Editing pricing
+- **Source of truth:** `src/main/resources/billing/org-billing-config.json` — the
+  9-org JSON (field names map directly to `OrgBillingConfig`). Editing pricing
   = editing this file; no recompile of logic.
 - **Validation at load:** non-empty tiers; exactly one unbounded (`null`) tier and it
-  must be **last**; rates ≥ 0; `orgId` unique. Fail fast on a bad config.
+  must be **last**; rates, fees and quotas ≥ 0; `orgId` unique. Fail fast on a bad config.
 - **Swap-in path:** because the engine depends only on `BillingConfigRepository`, a
   future `JdbcBillingConfigRepository` backed by the `feereport` table (§2.3) can replace
   the in-memory + JSON loader with **zero change** to `BillingEngineService`.
 
-### 8.5.4 The eight supported organisations
+### 8.5.4 The nine supported organisations
 
-| Organisation | orgId | Tiered | Free tier | Min-fee floor | Fixed monthly | Waive |
-|---|---|:--:|:--:|:--:|:--:|:--:|
-| Prudential Life Assurance | 0107537001897 | ✓ | – | – | – | ✓ |
-| Tokio Marine Life Insurance | 0107540000103 | ✓ | ✓ (50k@0) | – | – | ✓ |
-| Muang Thai Insurance | 0107551000151 | ✓ | – | ✓ 42,000.00 | – | – |
-| Dhipaya Life Assurance | 0107556000051 | ✓ | ✓ (240k@0) | – | – | ✓ |
-| BCI (Thailand) | 0125562016973 | ✓ | ✓ (30k@0) | – | – | ✓ |
-| Government Savings Bank | 0994000164891 | ✓ | – | ✓ 0.00* | – | – |
-| Krungthai Bank | 0107537000882 | ✓ | – | – | ✓ 30,000.00 | – |
-| Advanced Digital Distribution | 0105561025634 | ✓ | – | ✓ 28,000.00 | – | – |
+| Organisation | orgId | Cycle | Free tier | Base fee | Min fee | Prepaid | Annual cap | Waive |
+|---|---|---|---|--:|--:|--:|--:|:--:|
+| Prudential Life Assurance | 0107537001897 | Monthly | – | – | – | 514,285 | – | ✓ |
+| Dhipaya Life Assurance | 0107556000051 | **Yearly** | 240k@0 | – | – | – | – | ✓ |
+| BCI (Thailand) | 0125562016973 | **Yearly** | 30k@0 | 100,000 | – | – | – | ✓ |
+| Tokio Marine Life Insurance | 0107540000103 | Monthly | 50k@0 | 35,500 | – | – | – | ✓ |
+| CU *(pending orgId)* | CU_PENDING_ID | **Yearly** | 15k@0 | – | – | – | – | ✓ |
+| Muang Thai Insurance | 0107551000151 | Monthly | – | – | 42,000 | – | – | – |
+| Advanced Digital Distribution | 0105561025634 | Monthly | – | – | 28,000 | – | – | – |
+| Krungthai Bank | 0107537000882 | Monthly | – | 30,000 | – | – | – | – |
+| Government Savings Bank | 0994000164891 | Monthly | – | – | 0.00* | – | 226,000 | – |
 
-\* GSB's `minimumFee = 0.00` is an explicit **zero floor** (a no-op guarantee); kept
-for config symmetry. Every org uses Progressive Tiered as its base.
+\* GSB's `minimumFee = 0.00` is an explicit **zero floor** (no-op). `CU` has a placeholder
+orgId (`CU_PENDING_ID`) and no data yet. Every org uses Progressive Tiered as its base.
 
 ### 8.5.5 Assumptions & open questions — **[CONFIRM]**
 
-1. **`maxCapacity` = tier width, not cumulative ceiling.** Confirmed by Prudential
-   (`720000 ×4` repeated) — repeated values only make sense as widths. The engine
-   treats them as widths.
-2. **Minimum-limit threshold for the waive rule = first tier's capacity.** The supplied
-   JSON has `waiveIfBelowMinimum` (boolean) but **no explicit threshold**. We derive it
-   from `tiers[0].maxCapacity` (e.g. Prudential 720,000; Dhipaya 240,000). **Confirm**
-   this is correct, or add an explicit `minimumCommitment` field to the config.
-3. **Waive compares against *which* usage — monthly or accumulated YTD?** §8.3's original
-   rule compared **accumulated** YTD usage to the minimum. The JSON is silent. Default
-   assumption: compare the **report period's usage**; **confirm** vs. accumulated.
-4. **Fixed Monthly Fee is additive** (`tiered + fixed`). Krungthai has both a fixed fee
-   and tiers, so additive is the natural reading — **confirm** it isn't an alternative
-   (either/or) model.
-5. **orgIds vs. live data.** 6 of 8 orgIds exist in the imported `fmsv_db`
-   (Tokio/Dhipaya/BCI/GSB/Krungthai/Advanced); **Prudential `0107537001897`** and
-   **Muang Thai `0107551000151`** are **not** in the current dataset — their reports
-   will be empty until data exists. Note: `0107537001897` (Prudential) is one digit off
-   the real Krungthai `0107537000882` — **confirm** it's not a typo.
+1. **`maxCapacity` = tier width**, not cumulative ceiling (confirmed by Prudential's
+   repeated `720000`). Waive threshold = first tier's capacity (no explicit field).
+2. **MONTHLY = incremental.** Each month bills only its *new* billable transactions (so
+   prepaid/cap aren't re-billed across months) and tiers reset per month; **YEARLY** bills
+   the full YTD billable, tiered over the whole year. **[confirm]**
+3. **Waive uses accumulated YTD** usage vs the first-tier capacity. For Prudential this
+   means it stays **waived while YTD < 720,000 even above the prepaid quota** — confirm,
+   or have the prepaid quota override the waive.
+4. **Waive zeroes everything**, including the base fee (e.g. Tokio below 50k → 0 despite
+   its 35,500 base fee). **[confirm]**
+5. **Yearly orgs in the monthly report** show a YTD invoice that grows each month —
+   confirm, or bill yearly orgs only in a designated month.
+6. **Data coverage:** Prudential (`0107537001897`, one digit off KTB `0107537000882`),
+   Muang Thai (`0107551000151`) and `CU_PENDING_ID` are **not** in `fmsv_db` yet — their
+   reports are empty until data exists.
 
 ---
 
