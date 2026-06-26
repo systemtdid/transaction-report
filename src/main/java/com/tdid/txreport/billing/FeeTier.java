@@ -12,9 +12,4 @@ public record FeeTier(int tierNumber, Long maxCapacity, BigDecimal rate) {
     public boolean isUnbounded() {
         return maxCapacity == null;
     }
-
-    /** A zero-rated (free) tier. */
-    public boolean isFree() {
-        return rate.signum() == 0;
-    }
 }

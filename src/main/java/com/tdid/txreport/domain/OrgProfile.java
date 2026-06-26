@@ -7,8 +7,4 @@ public record OrgProfile(
         String displayName,
         String gatewayId,
         String organizations) {
-
-    public boolean hasGatewayFilter() {
-        return gatewayId != null && !gatewayId.isBlank();
-    }
 }

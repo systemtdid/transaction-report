@@ -1,6 +1,5 @@
 package com.tdid.txreport.billing;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -12,6 +11,4 @@ import java.util.Optional;
 public interface BillingConfigRepository {
 
     Optional<OrgBillingConfig> findByOrgId(String orgId);
-
-    List<OrgBillingConfig> findAll();
 }

@@ -27,10 +27,6 @@ public class OrgRegistryProperties {
                 .collect(Collectors.toMap(OrgProfile::orgId, Function.identity()));
     }
 
-    public List<OrgProfile> buildList() {
-        return orgs.stream().map(OrgEntry::toProfile).toList();
-    }
-
     public static class OrgEntry {
         private String orgId;
         private String displayName;

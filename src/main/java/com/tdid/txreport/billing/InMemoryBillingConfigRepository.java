@@ -1,6 +1,5 @@
 package com.tdid.txreport.billing;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,23 +16,16 @@ public class InMemoryBillingConfigRepository implements BillingConfigRepository 
 
     private final Map<String, OrgBillingConfig> byOrgId = new ConcurrentHashMap<>();
 
-    /** Replace all configs (called by the seeder). Preserves insertion order for {@link #findAll()}. */
+    /** Replace all configs (called by the seeder at startup). */
     void replaceAll(List<OrgBillingConfig> configs) {
-        Map<String, OrgBillingConfig> next = new LinkedHashMap<>();
-        for (OrgBillingConfig c : configs) {
-            next.put(c.orgId(), c);
-        }
         byOrgId.clear();
-        byOrgId.putAll(next);
+        for (OrgBillingConfig c : configs) {
+            byOrgId.put(c.orgId(), c);
+        }
     }
 
     @Override
     public Optional<OrgBillingConfig> findByOrgId(String orgId) {
         return Optional.ofNullable(byOrgId.get(orgId));
-    }
-
-    @Override
-    public List<OrgBillingConfig> findAll() {
-        return List.copyOf(byOrgId.values());
     }
 }
