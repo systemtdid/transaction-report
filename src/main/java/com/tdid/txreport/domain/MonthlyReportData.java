@@ -11,7 +11,7 @@ public record MonthlyReportData(
         List<MonthlyTierLine> lines,
         long totalUsage,
         BigDecimal computedFee,
-        BigDecimal fixedMonthlyFee,
+        BigDecimal baseFee,
         boolean minimumFeeApplied,
         BigDecimal billedFee,
         boolean belowMinimum,

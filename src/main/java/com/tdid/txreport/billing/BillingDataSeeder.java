@@ -67,9 +67,10 @@ public class BillingDataSeeder {
             RawTier t = o.tiers().get(i);
             tiers.add(new FeeTier(i + 1, t.maxCapacity(), t.rate()));
         }
+        BillingCycle cycle = o.billingCycle() != null ? o.billingCycle() : BillingCycle.MONTHLY;
         return new OrgBillingConfig(
-                o.orgId(), o.orgName(), o.minimumFee(), o.fixedMonthlyFee(),
-                o.waiveIfBelowMinimum(), List.copyOf(tiers));
+                o.orgId(), o.orgName(), cycle, o.baseFee(), o.minimumFee(),
+                o.prepaidQuota(), o.annualMaxCap(), o.waiveIfBelowMinimum(), List.copyOf(tiers));
     }
 
     /** Fail fast on structurally invalid configs (ARCHITECTURE.md §8.5.3). */
@@ -100,17 +101,27 @@ public class BillingDataSeeder {
             throw new IllegalStateException(
                     "Org " + c.orgId() + " must have exactly one unbounded (null) tier; found " + unbounded);
         }
-        if (c.minimumFee() != null && c.minimumFee().signum() < 0) {
-            throw new IllegalStateException("Org " + c.orgId() + " has a negative minimumFee");
+        requireNonNegative(c.orgId(), "baseFee", c.baseFee());
+        requireNonNegative(c.orgId(), "minimumFee", c.minimumFee());
+        if (c.prepaidQuota() != null && c.prepaidQuota() < 0) {
+            throw new IllegalStateException("Org " + c.orgId() + " has a negative prepaidQuota");
         }
-        if (c.fixedMonthlyFee() != null && c.fixedMonthlyFee().signum() < 0) {
-            throw new IllegalStateException("Org " + c.orgId() + " has a negative fixedMonthlyFee");
+        if (c.annualMaxCap() != null && c.annualMaxCap() < 0) {
+            throw new IllegalStateException("Org " + c.orgId() + " has a negative annualMaxCap");
+        }
+    }
+
+    private void requireNonNegative(String orgId, String field, BigDecimal value) {
+        if (value != null && value.signum() < 0) {
+            throw new IllegalStateException("Org " + orgId + " has a negative " + field);
         }
     }
 
     // ---- internal JSON shapes; tierNumber is assigned by the seeder, not the file ----
-    record RawOrg(String orgId, String orgName, BigDecimal minimumFee,
-                  BigDecimal fixedMonthlyFee, boolean waiveIfBelowMinimum, List<RawTier> tiers) {}
+    record RawOrg(String orgId, String orgName, BillingCycle billingCycle,
+                  BigDecimal baseFee, BigDecimal minimumFee,
+                  Long prepaidQuota, Long annualMaxCap,
+                  boolean waiveIfBelowMinimum, List<RawTier> tiers) {}
 
     record RawTier(Long maxCapacity, BigDecimal rate) {}
 }

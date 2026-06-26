@@ -58,7 +58,7 @@ public class MonthlyReportService {
 
         List<MonthlyTierLine> lines;
         BigDecimal tieredTotal;     // sum of the tier rows (the tier-table Total)
-        BigDecimal fixedMonthlyFee; // additive fixed fee (0 if none)
+        BigDecimal baseFee;         // additive base fee (0 if none)
         boolean minimumFeeApplied;  // min-fee floor raised the invoice
         BigDecimal billedFee;       // final invoice amount
         boolean belowMinimum;
@@ -66,10 +66,11 @@ public class MonthlyReportService {
 
         Optional<OrgBillingConfig> config = billingConfigRepo.findByOrgId(org.orgId());
         if (config.isPresent()) {
-            BillingResult result = billingEngine.calculate(config.get(), usage);
+            // Pass YTD accumulated usage too — needed for prepaid quota / annual cap rules.
+            BillingResult result = billingEngine.calculate(config.get(), usage, accumulated);
             lines = toTierLines(result.tierBreakdown());
             tieredTotal = result.tieredFee();
-            fixedMonthlyFee = result.fixedMonthlyFee();
+            baseFee = result.baseFee();
             minimumFeeApplied = result.minimumFeeApplied();
             billedFee = result.billedFee();
             belowMinimum = result.waived();
@@ -78,7 +79,7 @@ public class MonthlyReportService {
             // No billing config for this org — usage only, no invoice.
             lines = List.of();
             tieredTotal = ZERO;
-            fixedMonthlyFee = ZERO;
+            baseFee = ZERO;
             minimumFeeApplied = false;
             billedFee = ZERO;
             belowMinimum = false;
@@ -89,7 +90,7 @@ public class MonthlyReportService {
 
         return new MonthlyReportData(
                 org, period, lines, usage,
-                tieredTotal, fixedMonthlyFee, minimumFeeApplied, billedFee, belowMinimum,
+                tieredTotal, baseFee, minimumFeeApplied, billedFee, belowMinimum,
                 accumulated, remark, runStamp);
     }
 

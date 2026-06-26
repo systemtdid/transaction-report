@@ -8,13 +8,19 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
- * Stateless, pure billing engine. Applies the five pricing logics in a fixed,
- * deterministic order:
+ * Stateless, pure billing engine. Given a config, the period usage and the
+ * year-to-date accumulated usage, it computes one invoice applying, in order:
+ *
  * <ol>
- *   <li>Progressive tiered pricing (a free tier is simply {@code rate == 0})</li>
- *   <li>Fixed monthly fee (additive)</li>
- *   <li>Minimum-fee guarantee (floor)</li>
- *   <li>Minimum-limit waive (final override to {@code 0.00})</li>
+ *   <li><b>Prepaid quota</b> — the first {@code prepaidQuota} txns of the year are free.</li>
+ *   <li><b>Annual max cap</b> — at most {@code annualMaxCap} billable txns per year.</li>
+ *   <li><b>Billing cycle</b> — MONTHLY bills this period's new billable txns; YEARLY bills
+ *       the whole year-to-date billable txns.</li>
+ *   <li><b>Progressive tiered pricing</b> (a free tier is simply {@code rate == 0}).</li>
+ *   <li><b>Base fee</b> — added to the tier fee.</li>
+ *   <li><b>Minimum-fee guarantee</b> — floor.</li>
+ *   <li><b>Minimum-limit waive</b> — final override to {@code 0.00} while YTD usage is below
+ *       the minimum.</li>
  * </ol>
  * See ARCHITECTURE.md §8.5.2.
  */
@@ -26,33 +32,37 @@ public class BillingEngineService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
-    public BillingResult calculate(OrgBillingConfig config, long usage) {
-        long normalisedUsage = Math.max(usage, 0L);
+    public BillingResult calculate(OrgBillingConfig config, long periodUsage, long accumulatedUsage) {
+        long period = Math.max(periodUsage, 0L);
+        long accumulated = Math.max(accumulatedUsage, period); // accumulated must include this period
+        long priorAccumulated = accumulated - period;
 
-        // 1 + 2. Progressive tiered pricing (free tier = rate 0; every tier recorded).
+        // Rules 1 + 2 + 3: how many transactions are actually billable on this invoice.
+        long billableThrough = billableOf(config, accumulated);       // billable YTD incl. this period
+        long billableBefore = billableOf(config, priorAccumulated);   // billable YTD before this period
+        long billableUsage = config.isYearly()
+                ? billableThrough
+                : Math.max(0L, billableThrough - billableBefore);     // MONTHLY: only this period's new billable
+
+        // Rule 4: progressive tiered pricing (free tier = rate 0; every tier recorded).
         List<TierCharge> breakdown = new ArrayList<>(config.tiers().size());
         BigDecimal tieredFee = ZERO;
-        long remaining = normalisedUsage;
+        long remaining = billableUsage;
         for (FeeTier tier : config.tiers()) {
-            long units = tier.isUnbounded()
-                    ? remaining
-                    : Math.min(remaining, tier.maxCapacity());
-            BigDecimal charge = tier.rate()
-                    .multiply(BigDecimal.valueOf(units))
-                    .setScale(2, RoundingMode.HALF_UP);
-            breakdown.add(new TierCharge(tier.tierNumber(), tier.maxCapacity(),
-                    tier.rate(), units, charge));
+            long units = tier.isUnbounded() ? remaining : Math.min(remaining, tier.maxCapacity());
+            BigDecimal charge = tier.rate().multiply(BigDecimal.valueOf(units)).setScale(2, RoundingMode.HALF_UP);
+            breakdown.add(new TierCharge(tier.tierNumber(), tier.maxCapacity(), tier.rate(), units, charge));
             tieredFee = tieredFee.add(charge);
             remaining -= units;
         }
 
-        // 3. Fixed monthly fee (additive).
-        BigDecimal fixedFee = config.hasFixedMonthlyFee()
-                ? config.fixedMonthlyFee().setScale(2, RoundingMode.HALF_UP)
+        // Rule 5: base fee (additive).
+        BigDecimal baseFee = config.hasBaseFee()
+                ? config.baseFee().setScale(2, RoundingMode.HALF_UP)
                 : ZERO;
-        BigDecimal computedFee = tieredFee.add(fixedFee);
+        BigDecimal computedFee = tieredFee.add(baseFee);
 
-        // 4. Minimum-fee guarantee (floor).
+        // Rule 6: minimum-fee guarantee (floor).
         BigDecimal guaranteed = computedFee;
         boolean minimumFeeApplied = false;
         if (config.hasMinimumFee()) {
@@ -63,11 +73,11 @@ public class BillingEngineService {
             }
         }
 
-        // 5. Minimum-limit waive (final override → 0.00; wins over the above).
+        // Minimum-limit waive (override → 0): YTD accumulated usage below the first-tier minimum.
         BigDecimal billedFee;
         boolean waived;
         String remark;
-        if (config.waiveIfBelowMinimum() && normalisedUsage < config.minimumLimit()) {
+        if (config.waiveIfBelowMinimum() && accumulated < config.minimumLimit()) {
             billedFee = ZERO;
             waived = true;
             remark = BELOW_MIN_REMARK;
@@ -78,8 +88,20 @@ public class BillingEngineService {
         }
 
         return new BillingResult(
-                config.orgId(), normalisedUsage, List.copyOf(breakdown),
-                tieredFee, fixedFee, computedFee, billedFee,
+                config.orgId(), config.billingCycle(), period, accumulated, billableUsage,
+                List.copyOf(breakdown), tieredFee, baseFee, computedFee, billedFee,
                 minimumFeeApplied, waived, remark);
+    }
+
+    /** Billable transaction count out of an accumulated total: prepaid is free, capped at the annual max. */
+    private static long billableOf(OrgBillingConfig config, long accumulated) {
+        long b = Math.max(0L, accumulated);
+        if (config.hasPrepaidQuota()) {
+            b = Math.max(0L, b - config.prepaidQuota());
+        }
+        if (config.hasAnnualMaxCap()) {
+            b = Math.min(b, config.annualMaxCap());
+        }
+        return b;
     }
 }

@@ -4,29 +4,41 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Declarative per-organisation pricing. A {@code null} {@code minimumFee} or
- * {@code fixedMonthlyFee} means that logic is not applied. See ARCHITECTURE.md §8.5.
+ * Declarative per-organisation pricing. {@code null} optional fields switch that
+ * logic off. See ARCHITECTURE.md §8.5.
+ *
+ * <ul>
+ *   <li>{@code billingCycle}  — MONTHLY bills the month; YEARLY bills the year-to-date.</li>
+ *   <li>{@code baseFee}       — flat fee added to the tier fee (any cycle).</li>
+ *   <li>{@code minimumFee}    — floor: invoice never drops below it.</li>
+ *   <li>{@code prepaidQuota}  — first N transactions of the year are free (not billed).</li>
+ *   <li>{@code annualMaxCap}  — at most N billable transactions per year.</li>
+ *   <li>{@code waiveIfBelowMinimum} — waive the invoice while YTD usage is below the minimum.</li>
+ * </ul>
  */
 public record OrgBillingConfig(
         String orgId,
         String orgName,
+        BillingCycle billingCycle,
+        BigDecimal baseFee,
         BigDecimal minimumFee,
-        BigDecimal fixedMonthlyFee,
+        Long prepaidQuota,
+        Long annualMaxCap,
         boolean waiveIfBelowMinimum,
         List<FeeTier> tiers) {
 
-    public boolean hasMinimumFee() {
-        return minimumFee != null;
-    }
+    public boolean hasBaseFee()      { return baseFee != null; }
+    public boolean hasMinimumFee()   { return minimumFee != null; }
+    public boolean hasPrepaidQuota() { return prepaidQuota != null; }
+    public boolean hasAnnualMaxCap() { return annualMaxCap != null; }
 
-    public boolean hasFixedMonthlyFee() {
-        return fixedMonthlyFee != null;
+    public boolean isYearly() {
+        return billingCycle == BillingCycle.YEARLY;
     }
 
     /**
-     * Contractual minimum used by the waive rule. ASSUMPTION (ARCHITECTURE.md
-     * §8.5.5 #2): equal to the first tier's capacity. Returns 0 when there are no
-     * tiers or the first tier is unbounded (so the waive never triggers).
+     * Contractual minimum used by the waive rule — the first tier's capacity.
+     * Returns 0 when there are no tiers or the first tier is unbounded.
      */
     public long minimumLimit() {
         if (tiers.isEmpty() || tiers.get(0).maxCapacity() == null) {
