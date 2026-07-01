@@ -68,9 +68,11 @@ public class BillingDataSeeder {
             tiers.add(new FeeTier(i + 1, t.maxCapacity(), t.rate()));
         }
         BillingCycle cycle = o.billingCycle() != null ? o.billingCycle() : BillingCycle.MONTHLY;
+        int startMonth = o.billingYearStartMonth() != null ? o.billingYearStartMonth() : 1;
         return new OrgBillingConfig(
                 o.orgId(), o.orgName(), cycle, o.baseFee(), o.minimumFee(),
-                o.prepaidQuota(), o.annualMaxCap(), o.waiveIfBelowMinimum(), List.copyOf(tiers));
+                o.prepaidQuota(), o.annualMaxCap(), o.waiveIfBelowMinimum(), List.copyOf(tiers),
+                startMonth);
     }
 
     /** Fail fast on structurally invalid configs (ARCHITECTURE.md §8.5.3). */
@@ -109,6 +111,9 @@ public class BillingDataSeeder {
         if (c.annualMaxCap() != null && c.annualMaxCap() < 0) {
             throw new IllegalStateException("Org " + c.orgId() + " has a negative annualMaxCap");
         }
+        if (c.billingYearStartMonth() < 1 || c.billingYearStartMonth() > 12) {
+            throw new IllegalStateException("Org " + c.orgId() + " has an invalid billingYearStartMonth (must be 1-12)");
+        }
     }
 
     private void requireNonNegative(String orgId, String field, BigDecimal value) {
@@ -121,7 +126,8 @@ public class BillingDataSeeder {
     record RawOrg(String orgId, String orgName, BillingCycle billingCycle,
                   BigDecimal baseFee, BigDecimal minimumFee,
                   Long prepaidQuota, Long annualMaxCap,
-                  boolean waiveIfBelowMinimum, List<RawTier> tiers) {}
+                  boolean waiveIfBelowMinimum, List<RawTier> tiers,
+                  Integer billingYearStartMonth) {}
 
     record RawTier(Long maxCapacity, BigDecimal rate) {}
 }

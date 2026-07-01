@@ -2,7 +2,6 @@ package com.tdid.txreport.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -21,6 +20,7 @@ import com.tdid.txreport.billing.TierCharge;
 import com.tdid.txreport.domain.MonthlyReportData;
 import com.tdid.txreport.domain.MonthlyTierLine;
 import com.tdid.txreport.domain.OrgProfile;
+import com.tdid.txreport.repository.MonthlySummaryRepository;
 import com.tdid.txreport.repository.TransactionRepository;
 
 @Service
@@ -29,32 +29,49 @@ public class MonthlyReportService {
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
     private final TransactionRepository repo;
+    private final MonthlySummaryRepository summaryRepo;
+    private final SummaryMaintenanceService summaryMaintenance;
     private final BillingConfigRepository billingConfigRepo;
     private final BillingEngineService billingEngine;
     private final ZoneId zone;
 
     public MonthlyReportService(TransactionRepository repo,
+                                MonthlySummaryRepository summaryRepo,
+                                SummaryMaintenanceService summaryMaintenance,
                                 BillingConfigRepository billingConfigRepo,
                                 BillingEngineService billingEngine,
                                 @Value("${txreport.default-zone:Asia/Bangkok}") String zoneName) {
         this.repo = repo;
+        this.summaryRepo = summaryRepo;
+        this.summaryMaintenance = summaryMaintenance;
         this.billingConfigRepo = billingConfigRepo;
         this.billingEngine = billingEngine;
         this.zone = ZoneId.of(zoneName);
     }
 
     public MonthlyReportData build(OrgProfile org, YearMonth period) {
-        LocalDate monthStart = period.atDay(1);
-        LocalDate endExclusive = period.plusMonths(1).atDay(1);
-        LocalDateTime start = monthStart.atStartOfDay();
-        LocalDateTime end = endExclusive.atStartOfDay();
+        Optional<OrgBillingConfig> config = billingConfigRepo.findByOrgId(org.orgId());
 
-        // Gateway-scoped usage: count all transactions through the gateway (org filter omitted).
-        long usage = repo.countSuccess(null, org.gatewayId(), start, end);
+        // Billing year runs from billingYearStartMonth; the accumulated (YTD) window is the
+        // range of months from the most recent cycle start up to the report month.
+        int startMonth = config.map(OrgBillingConfig::billingYearStartMonth).orElse(1);
+        YearMonth cycleStart = (period.getMonthValue() >= startMonth)
+                ? YearMonth.of(period.getYear(), startMonth)
+                : YearMonth.of(period.getYear() - 1, startMonth);
 
-        // Accumulated = year-to-date in the same calendar year (display only).
-        LocalDateTime yearStart = LocalDate.of(period.getYear(), 1, 1).atStartOfDay();
-        long accumulated = repo.countSuccess(null, org.gatewayId(), yearStart, end);
+        long usage;
+        long accumulated;
+        if (summaryMaintenance.isAvailable()) {
+            // Read pre-aggregated counts (fast at 4-10M rows/month).
+            usage = summaryRepo.usage(org.gatewayId(), period.toString());
+            accumulated = summaryRepo.accumulated(org.gatewayId(), cycleStart.toString(), period.toString());
+        } else {
+            // Fallback: scan transactions directly (gateway-scoped).
+            LocalDateTime monthStart = period.atDay(1).atStartOfDay();
+            LocalDateTime monthEnd = period.plusMonths(1).atDay(1).atStartOfDay();
+            usage = repo.countSuccess(null, org.gatewayId(), monthStart, monthEnd);
+            accumulated = repo.countSuccess(null, org.gatewayId(), cycleStart.atDay(1).atStartOfDay(), monthEnd);
+        }
 
         List<MonthlyTierLine> lines;
         BigDecimal tieredTotal;     // sum of the tier rows (the tier-table Total)
@@ -64,9 +81,7 @@ public class MonthlyReportService {
         boolean belowMinimum;
         String remark;
 
-        Optional<OrgBillingConfig> config = billingConfigRepo.findByOrgId(org.orgId());
         if (config.isPresent()) {
-            // Pass YTD accumulated usage too — needed for prepaid quota / annual cap rules.
             BillingResult result = billingEngine.calculate(config.get(), usage, accumulated);
             lines = toTierLines(result.tierBreakdown());
             tieredTotal = result.tieredFee();

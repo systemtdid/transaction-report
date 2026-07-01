@@ -14,6 +14,8 @@ import java.util.List;
  *   <li>{@code prepaidQuota}  — first N transactions of the year are free (not billed).</li>
  *   <li>{@code annualMaxCap}  — at most N billable transactions per year.</li>
  *   <li>{@code waiveIfBelowMinimum} — waive the invoice while YTD usage is below the minimum.</li>
+ *   <li>{@code billingYearStartMonth} — month (1–12) the customer's billing year starts;
+ *       drives the "accumulated" (YTD) window and the annual rules. Default 1 (January).</li>
  * </ul>
  */
 public record OrgBillingConfig(
@@ -25,7 +27,8 @@ public record OrgBillingConfig(
         Long prepaidQuota,
         Long annualMaxCap,
         boolean waiveIfBelowMinimum,
-        List<FeeTier> tiers) {
+        List<FeeTier> tiers,
+        int billingYearStartMonth) {
 
     public boolean hasBaseFee()      { return baseFee != null; }
     public boolean hasMinimumFee()   { return minimumFee != null; }
